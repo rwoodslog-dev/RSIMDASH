@@ -247,7 +247,7 @@ def make_handler(st):
             self.wfile.write(body)
 
         def cors(self):
-            # l'appli RSIM peut etre servie ailleurs (Netlify, APK) : on autorise les appels vers l'agent
+            # l appli Android (APK) appelle l agent depuis une autre origine : on autorise
             self.send_header("Access-Control-Allow-Origin", "*")
             self.send_header("Access-Control-Allow-Private-Network", "true")
 
@@ -372,6 +372,21 @@ def lan_ip():
         return "127.0.0.1"
 
 
+def open_app_window(url):
+    """Ouvre RSIM dans sa propre fenetre (Edge ou Chrome en mode appli, sans barre de navigateur)."""
+    if sys.platform == "win32":
+        import subprocess
+        pf = [os.environ.get(k, "") for k in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA")]
+        for exe in [os.path.join(b, r"Microsoft\Edge\Application\msedge.exe") for b in pf] + \
+                   [os.path.join(b, r"Google\Chrome\Application\chrome.exe") for b in pf]:
+            if exe and os.path.isfile(exe):
+                prof = os.path.join(BASE, ".appwindow")      # profil separe = fenetre independante, taille memorisee
+                subprocess.Popen([exe, "--app=" + url, "--user-data-dir=" + prof, "--window-size=1280,800"])
+                return
+    import webbrowser
+    webbrowser.open(url)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8888)
@@ -393,8 +408,7 @@ def main():
     print(" En attente d'un jeu (AC/ACC/AC Rally, LMU, AMS2, RaceRoom)...")
     print("=" * 52)
     if not a.no_browser:
-        import webbrowser
-        threading.Timer(1.0, lambda: webbrowser.open("http://localhost:%d/hub" % a.port)).start()
+        threading.Timer(1.0, open_app_window, args=("http://localhost:%d/index.html" % a.port,)).start()
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

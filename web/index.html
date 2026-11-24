@@ -35,7 +35,6 @@
   <div><h1>RSIM</h1><small>Performance sim racing</small></div>
   <div class="status" id="status"><span class="dot"></span>…</div>
 </header>
-<div class="warn" id="warn"></div>
 <main>
   <a class="tile big" href="live.html"><div class="ico">🏁</div><b>Dash en direct</b><span>Le dashboard de la voiture que tu conduis, en plein écran.</span></a>
   <a class="tile" href="hub.html"><div class="ico">🗂</div><b>Dashboards</b><span>Tous tes dashs, aperçus, attribution aux voitures.</span></a>
@@ -54,10 +53,6 @@ else if (localStorage.getItem("rsimStart") === "live" && !sessionStorage.getItem
   sessionStorage.setItem("rsimHomeSeen", "1"); location.href = "live.html";
 }
 sessionStorage.setItem("rsimHomeSeen", "1");
-if (RSIMAPI.blocked) {
-  $("warn").style.display = "block";
-  $("warn").textContent = "Ce site (https) ne peut pas joindre le PC sur le Wi-Fi local : utilise l'appli Android RSIM, ou ouvre directement l'adresse du PC. Sur le PC lui-même, mets l'adresse http://localhost:8888 dans Paramètres.";
-}
 async function poll() {
   const st = $("status");
   try {

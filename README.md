@@ -96,21 +96,15 @@ L'éditeur : bouton « Créer un dashboard » ou « Éditer » dans le panneau.
 - Touches : modificateur 1 + modificateur 2 + touche, envoi **à l'appui / au relâchement / maintenu**, touche différente quand l'interrupteur passe à OFF, état visuel lié au jeu, remise à OFF quand le jeu est fermé, vibration. Bouton « Tester sur le PC ».
 - **Sur le téléphone** : `http://<IP du PC>:8888/editor` (ou appui long sur le dash → « Modifier ce dashboard »). Boutons ronds : ➕ ajouter, 🎨 personnaliser, ⧉ dupliquer, ☰ calques/pages, 🗑 supprimer. Glisser au doigt, coin bleu pour redimensionner.
 
-## Appli RSIM (Android + Netlify)
-L'appli RSIM regroupe tout : accueil par modules (Dash en direct, Dashboards, Éditeur, Boutons volant, Paramètres ; Télémétrie et Profils FFB à venir).
-Elle fonctionne de 3 façons, avec les mêmes fichiers (`web/`) :
-- **Servie par le PC** : `http://<IP du PC>:8888` (rien à régler).
-- **APK Android** (recommandé sur le téléphone) : se connecte au PC en Wi-Fi. Au 1er lancement, Paramètres → adresse du PC.
-- **Site Netlify** : pratique sur le PC (adresse `localhost:8888`). Sur téléphone, un site https ne peut pas joindre le PC en Wi-Fi : utiliser l'APK.
+## Appli RSIM : PC + Android sur le même Wi-Fi
+- **Sur le PC** : le raccourci *RSIM Dash* lance l'agent et ouvre RSIM dans **sa propre fenêtre** (Edge/Chrome en mode appli, sans barre de navigateur).
+- **Sur le téléphone** : l'**APK RSIM**. Au 1er lancement il **recherche le PC tout seul** sur le Wi-Fi (sinon : Paramètres → adresse affichée sur le PC).
+- Même appli des deux côtés : accueil par modules (Dash en direct, Dashboards, Éditeur, Boutons volant, Paramètres ; Télémétrie et Profils FFB à venir).
 
 ### Mettre le projet sur GitHub (une fois)
-1. Crée un dépôt GitHub (ex. `rsim`), privé si tu veux.
-2. Envoie tout le dossier `rsim-dash` dedans (GitHub Desktop : *Add existing repository* → *Publish*).
+1. Crée un dépôt GitHub (ex. `rsim`).
+2. Envoie tout le dossier `rsim-dash` (GitHub Desktop : *Add existing repository* → *Publish*). Les fichiers perso et générés sont exclus par `.gitignore`.
 
 ### Obtenir l'APK (automatique)
 - À chaque envoi, GitHub construit l'APK : onglet **Actions** → dernier « Build APK RSIM » → **Artifacts** → `RSIM-apk` (zip contenant `app-debug.apk`).
 - Copie l'APK sur le téléphone et installe-le (autoriser « sources inconnues »). Pour le prêter à un collègue : même APK.
-
-### Mettre le site sur Netlify
-- Netlify → *Add new site* → *Import from GitHub* → choisis le dépôt. Le fichier `netlify.toml` publie le dossier `web` (aucun réglage).
-- Ou glisser-déposer le dossier `web` sur app.netlify.com/drop.

@@ -30,7 +30,8 @@
     <h2>Connexion au PC (RSIM Agent)</h2>
     <div class="hint" id="mode"></div>
     <div class="row"><input id="pc" placeholder="ex : 192.168.1.20:8888" inputmode="url" autocapitalize="off" autocorrect="off"></div>
-    <div class="row"><button class="pri" id="bTest">Tester et enregistrer</button><button id="bLocal">Ce PC (localhost)</button></div>
+    <div class="row"><button class="pri" id="bScan">🔍 Rechercher le PC automatiquement</button></div>
+    <div class="row"><button id="bTest">Tester et enregistrer l'adresse</button><button id="bLocal">Ce PC (localhost)</button></div>
     <div id="res" style="margin-top:10px"></div>
     <ol>
       <li>Sur le PC, lance <b>RSIM Dash</b> (raccourci du bureau).</li>
@@ -52,7 +53,7 @@
   </section>
   <section>
     <h2>À venir</h2>
-    <div class="hint">Profils FFB (Pit House + jeux) à enregistrer et partager · Télémétrie et comparaison de tours · Comptes et partage.</div>
+    <div class="hint">Télémétrie et comparaison de tours · Profils FFB (Pit House + jeux) à enregistrer et partager.</div>
   </section>
 </main>
 <script src="api.js"></script>
@@ -64,18 +65,23 @@ if (Q.get("first") || Q.get("from")) { $("secPC").classList.add("first"); }
 $("mode").textContent = RSIMAPI.servedByAgent
   ? "Tu utilises l'appli servie directement par ton PC : rien à régler ici (adresse : " + location.host + ")."
   : RSIMAPI.isApp ? "Appli Android : indique l'adresse de ton PC."
-  : "Appli web : indique l'adresse de ton PC.";
+  : "Indique l'adresse de ton PC, ou lance la recherche automatique.";
 $("pc").value = (localStorage.getItem("rsimPC") || (RSIMAPI.servedByAgent ? location.origin + "/" : "")).replace(/^http:\/\//, "").replace(/\/$/, "");
 $("bLocal").onclick = () => { $("pc").value = "localhost:8888"; test(); };
 $("bTest").onclick = test;
+$("bScan").onclick = scan;
+async function scan() {
+  $("bScan").disabled = true;
+  $("res").innerHTML = '<span class="hint">Recherche du PC sur le Wi-Fi… <b id="pct">0%</b></span>';
+  const h = await RSIMAPI.scan(p => { const e = $("pct"); if (e) e.textContent = Math.round(p * 100) + "%"; });
+  $("bScan").disabled = false;
+  if (h) { $("pc").value = h; test(); }
+  else $("res").innerHTML = '<span class="ko">PC non trouvé. Vérifie que RSIM tourne sur le PC et que le téléphone est sur le même Wi-Fi, ou tape l\'adresse affichée sur le PC.</span>';
+}
 async function test() {
   const v = $("pc").value.trim(); if (!v) return;
   $("res").innerHTML = '<span class="hint">Connexion…</span>';
   const u = RSIMAPI.norm(v);
-  if (location.protocol === "https:" && !/^http:\/\/(localhost|127\.0\.0\.1)/i.test(u)) {
-    $("res").innerHTML = '<span class="ko">Ce site est en https : le navigateur bloque l\'accès au PC sur le Wi-Fi. Utilise l\'appli Android RSIM, ou ouvre directement ' + u + ' dans Chrome.</span>';
-    return;
-  }
   const j = await RSIMAPI.ping(u);
   if (j) {
     RSIMAPI.setPC(u);
@@ -84,6 +90,7 @@ async function test() {
     else if (Q.get("first")) setTimeout(() => location.href = "index.html?home", 800);
   } else $("res").innerHTML = '<span class="ko">✖ Pas de réponse. Vérifie que RSIM Dash tourne sur le PC, le même Wi-Fi, et le pare-feu Windows (port 8888).</span>';
 }
+if (Q.get("first") && !RSIMAPI.servedByAgent && !localStorage.getItem("rsimPC")) scan();   // 1er lancement : on cherche tout seul
 $("start").value = localStorage.getItem("rsimStart") || "home";
 $("start").onchange = e => localStorage.setItem("rsimStart", e.target.value);
 $("orient").value = localStorage.getItem("orient") || "landscape-primary";
