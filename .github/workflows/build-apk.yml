@@ -1,0 +1,39 @@
+name: Build APK RSIM
+on:
+  push:
+    paths: ["web/**", "app-android/**", ".github/workflows/build-apk.yml"]
+  workflow_dispatch:
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app-android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - name: Dependances
+        run: npm install
+      - name: Copier l'appli web
+        run: node copy-web.js
+      - name: Projet Android
+        run: npx cap add android
+      - name: Autoriser le Wi-Fi local (http) + ecran allume
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<application android:usesCleartextTraffic="true"/' $M
+          grep -q WAKE_LOCK $M || sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />#' $M
+      - name: Icones
+        run: npx capacitor-assets generate --android || echo "icones par defaut"
+      - name: Synchroniser
+        run: npx cap sync android
+      - name: Compiler l'APK
+        working-directory: app-android/android
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RSIM-apk
+          path: app-android/android/app/build/outputs/apk/debug/app-debug.apk
