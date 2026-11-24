@@ -22,6 +22,7 @@ CARS = os.path.join(BASE, "cars.json")
 ASSIGN = os.path.join(BASE, "assignments.json")
 SEEN = os.path.join(BASE, "seen_cars.json")
 DASH_DIR = os.path.join(BASE, "dashboards")
+BB_DIR = os.path.join(BASE, "buttonboxes")      # button box fournies (modeles d'origine)
 BINDS = os.path.join(BASE, "bindings.json")
 
 
@@ -61,11 +62,15 @@ class State:
     # ---- dashboards personnalises (dossier dashboards/)
     def load_dashes(self):
         self.dashes = {}
-        for fn in sorted(os.listdir(DASH_DIR)):
-            if fn.endswith(".json"):
-                dsh = load_json(os.path.join(DASH_DIR, fn), None)
-                if dsh and dsh.get("id"):
-                    self.dashes[dsh["id"]] = dsh
+        # d'abord les modeles fournis, puis tes versions modifiees (meme id = remplace)
+        for folder in (BB_DIR, DASH_DIR):
+            if not os.path.isdir(folder):
+                continue
+            for fn in sorted(os.listdir(folder)):
+                if fn.endswith(".json"):
+                    dsh = load_json(os.path.join(folder, fn), None)
+                    if dsh and dsh.get("id"):
+                        self.dashes[dsh["id"]] = dsh
 
     def save_dash(self, dsh):
         dsh["id"] = re.sub(r"[^a-zA-Z0-9_-]", "_", dsh.get("id") or "dash_%d" % int(time.time()))
@@ -78,13 +83,15 @@ class State:
         path = os.path.join(DASH_DIR, re.sub(r"[^a-zA-Z0-9_-]", "_", did) + ".json")
         if os.path.isfile(path):
             os.remove(path)
-        self.dashes.pop(did, None)
+        self.load_dashes()          # un modele fourni reapparait (= reinitialiser)
         self.dash_rev += 1
 
     def all_profiles(self):
         prof = list(self.cars.get("profiles", []))
         for dsh in self.dashes.values():
-            prof.append({"id": "custom:" + dsh["id"], "name": "★ " + dsh.get("name", dsh["id"]), "family": "custom", "games": [], "match": dsh.get("match", [])})
+            prof.append({"id": "custom:" + dsh["id"], "name": ("🎛 " if dsh.get("category") == "Button box" else "★ ") + dsh.get("name", dsh["id"]),
+                         "family": "custom", "cat": dsh.get("category", "Mes dashboards perso"),
+                         "aspect": "16:9" if dsh.get("w") == 1600 else None, "games": [], "match": dsh.get("match", [])})
         return prof
 
     def pages_of(self, profile):
@@ -276,8 +283,8 @@ def make_handler(st):
             if p == "/cars.json":
                 return self.send(200, dict(st.cars, profiles=st.all_profiles()))
             q = parse_qs(urlparse(self.path).query)
-            if p == "/editor":
-                return self.static("editor.html")
+            if p in ("/editor", "/buttons"):
+                return self.static("buttons.html")
             if p == "/api/dashboards":
                 return self.send(200, [{"id": k, "name": v.get("name", k), "pages": len(v.get("pages", []))} for k, v in st.dashes.items()])
             if p == "/api/dashboard":

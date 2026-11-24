@@ -1,65 +1,779 @@
 {
-  "_info": "Profils de dashboards. 'match' = mots cherches dans le nom de voiture envoye par le jeu (minuscules). 'games' = mots cherches dans le nom du jeu. Les attributions faites dans la page Admin (assignments.json) passent avant.",
-  "defaults": {
-    "Le Mans Ultimate": "gt3_generic",
-    "Rally": "rally_generic",
-    "ACC": "gt3_generic",
-    "Assetto Corsa": "universal",
-    "Automobilista": "universal",
-    "RaceRoom": "universal",
-    "*": "universal"
+ "_info": "Profils de dashboards. 'match' = mots cherches dans le nom de voiture envoye par le jeu (minuscules). 'games' = mots cherches dans le nom du jeu. Les attributions faites dans la page Admin (assignments.json) passent avant.",
+ "defaults": {
+  "Le Mans Ultimate": "gt3_generic",
+  "Rally": "rally_generic",
+  "ACC": "gt3_generic",
+  "Assetto Corsa": "universal",
+  "Automobilista": "universal",
+  "RaceRoom": "universal",
+  "*": "universal"
+ },
+ "profiles": [
+  {
+   "id": "universal",
+   "name": "Universel",
+   "family": "gt3",
+   "games": [],
+   "match": [],
+   "theme": {
+    "accent": "#3fd0ff",
+    "bg": "#05070a",
+    "panel": "#0f141b",
+    "text": "#e9f1f7",
+    "gear": "#ffffff",
+    "leds": "center",
+    "font": "mono",
+    "layout": "A"
+   },
+   "cat": "Génériques"
   },
-  "profiles": [
-    {"id": "universal", "name": "Universel", "family": "gt3", "games": [], "match": [],
-     "theme": {"accent": "#3fd0ff", "bg": "#05070a", "panel": "#0f141b", "text": "#e9f1f7", "gear": "#ffffff", "leds": "center", "font": "mono", "layout": "A"}},
-
-    {"id": "gt3_generic", "name": "GT3 générique", "family": "gt3", "games": ["Le Mans", "ACC"], "match": [],
-     "theme": {"accent": "#ffb000", "bg": "#000000", "panel": "#111111", "text": "#f2f2f2", "gear": "#ffffff", "leds": "lr", "font": "mono", "layout": "A"}},
-
-    {"id": "lmu_ferrari_296", "name": "Ferrari 296 LMGT3", "family": "gt3", "games": ["Le Mans"], "match": ["ferrari", "296", "af corse"],
-     "theme": {"accent": "#ff2a1a", "bg": "#000000", "panel": "#161010", "text": "#ffffff", "gear": "#ffde00", "leds": "center", "font": "sans", "layout": "A", "ledShape": "dot"}},
-    {"id": "lmu_porsche_911", "name": "Porsche 911 GT3 R LMGT3", "family": "gt3", "games": ["Le Mans"], "match": ["porsche", "911", "manthey"],
-     "theme": {"accent": "#e6e6e6", "bg": "#050505", "panel": "#141414", "text": "#ffffff", "gear": "#ffffff", "leds": "lr", "font": "sans", "layout": "B", "ledShape": "bar", "warn": "#ff3b30"}},
-    {"id": "lmu_bmw_m4", "name": "BMW M4 LMGT3", "family": "grid", "games": ["Le Mans"], "match": ["bmw", "m4 ", "wrt"],
-     "theme": {"bg": "#2a2a2a", "border": "#9a9a9a", "text": "#e8e8e8", "gear": "#22e022", "tyre": "#c9c900", "shiftCol": "#ffffff"}},
-    {"id": "lmu_aston_vantage", "name": "Aston Martin Vantage AMR LMGT3", "family": "gt3", "games": ["Le Mans"], "match": ["aston", "vantage", "heart of racing"],
-     "theme": {"accent": "#00a86b", "bg": "#020604", "panel": "#0b1711", "text": "#eafff4", "gear": "#c8ff3d", "leds": "center", "font": "sans", "layout": "A", "ledShape": "dot"}},
-    {"id": "lmu_corvette_z06", "name": "Corvette Z06 LMGT3.R", "family": "gt3", "games": ["Le Mans"], "match": ["corvette", "z06"],
-     "theme": {"accent": "#ffd500", "bg": "#000000", "panel": "#15140a", "text": "#ffffff", "gear": "#ffd500", "leds": "lr", "font": "mono", "layout": "B", "ledShape": "bar"}},
-    {"id": "lmu_ford_mustang", "name": "Ford Mustang LMGT3", "family": "gt3", "games": ["Le Mans"], "match": ["ford", "mustang"],
-     "theme": {"accent": "#2f7bff", "bg": "#02040a", "panel": "#0c1222", "text": "#ffffff", "gear": "#ffffff", "leds": "center", "font": "mono", "layout": "B", "ledShape": "dot"}},
-    {"id": "lmu_lambo_huracan", "name": "Lamborghini Huracán LMGT3 Evo2", "family": "gt3", "games": ["Le Mans"], "match": ["lamborghini", "huracan", "huracán"],
-     "theme": {"accent": "#9bff00", "bg": "#000000", "panel": "#101508", "text": "#ffffff", "gear": "#ff9d00", "leds": "lr", "font": "sans", "layout": "A", "ledShape": "chevron"}},
-    {"id": "lmu_lexus_rcf", "name": "Lexus RC F LMGT3", "family": "gt3", "games": ["Le Mans"], "match": ["lexus", "rc f", "rcf", "akkodis"],
-     "theme": {"accent": "#ff6a13", "bg": "#000000", "panel": "#17100a", "text": "#ffffff", "gear": "#ffffff", "leds": "center", "font": "mono", "layout": "A", "ledShape": "bar"}},
-    {"id": "lmu_mclaren_720s", "name": "McLaren 720S LMGT3 Evo", "family": "gt3", "games": ["Le Mans"], "match": ["mclaren", "720s", "united autosports"],
-     "theme": {"accent": "#ff8000", "bg": "#000000", "panel": "#160d04", "text": "#ffffff", "gear": "#ff8000", "leds": "lr", "font": "sans", "layout": "B", "ledShape": "dot"}},
-    {"id": "lmu_mercedes_amg", "name": "Mercedes-AMG LMGT3", "family": "gt3", "games": ["Le Mans"], "match": ["mercedes", "amg"],
-     "theme": {"accent": "#00d2be", "bg": "#000000", "panel": "#071413", "text": "#ffffff", "gear": "#ffffff", "leds": "center", "font": "mono", "layout": "A", "ledShape": "bar"}},
-
-    {"id": "rally_generic", "name": "Rallye générique", "family": "rally", "games": ["Rally"], "match": [],
-     "theme": {"accent": "#ffcc00", "bg": "#000000", "panel": "#121212", "text": "#ffffff", "gear": "#ffffff", "leds": "lr", "font": "mono"}},
-
-    {"id": "acr_i20_rally2", "name": "Hyundai i20 N Rally2", "family": "bands", "games": ["Rally"], "match": ["i20", "hyundai"],
-     "theme": {"bands": ["#00e13c", "#ffd000", "#ff1a0d"], "sideW": 0.13, "start": 0.6, "shift": 0.96,
-               "bg": "#050505", "off": "#0e0e0e", "box": "#b3261a", "gear": "#7ce000", "text": "#ffffff", "boxSize": 210, "boxY": 62, "rpmSize": 66}},
-    {"id": "acr_208_rally4", "name": "Peugeot 208 Rally4", "family": "rally", "games": ["Rally"], "match": ["208"],
-     "theme": {"accent": "#c8ff00", "bg": "#000000", "panel": "#10140a", "text": "#ffffff", "gear": "#c8ff00", "leds": "center", "font": "mono"}},
-    {"id": "acr_fabia_rally2", "name": "Škoda Fabia Rally2", "family": "rally", "games": ["Rally"], "match": ["fabia", "skoda", "škoda"],
-     "theme": {"accent": "#4ba82e", "bg": "#000000", "panel": "#0b1409", "text": "#ffffff", "gear": "#ffffff", "leds": "lr", "font": "sans"}},
-
-    {"id": "acr_xsara_wrc", "name": "Citroën Xsara WRC 2003", "family": "lcd", "games": ["Rally"], "match": ["xsara", "citroen", "citroën"],
-     "theme": {"accent": "#1d2a1a", "bg": "#9fb28a", "panel": "#8da078", "text": "#11170e", "lcdOff": "rgba(17,23,14,0.08)", "backlight": "#b9cfa0"}},
-    {"id": "acr_306_maxi", "name": "Peugeot 306 Maxi Kit Car", "family": "lcd", "games": ["Rally"], "match": ["306"],
-     "theme": {"accent": "#2a1700", "bg": "#d08a1c", "panel": "#b97616", "text": "#1c0f00", "lcdOff": "rgba(28,15,0,0.10)", "backlight": "#f0a430"}},
-    {"id": "acr_impreza_93", "name": "Subaru Impreza 555 Gr.A 1993", "family": "lcd", "games": ["Rally"], "match": ["impreza", "subaru"],
-     "theme": {"accent": "#071420", "bg": "#7fb2c9", "panel": "#6d9fb6", "text": "#06121c", "lcdOff": "rgba(6,18,28,0.09)", "backlight": "#a6d4ea"}},
-
-    {"id": "acr_delta_integrale", "name": "Lancia Delta HF Integrale Evo", "family": "analog", "games": ["Rally"], "match": ["delta", "lancia", "integrale"],
-     "theme": {"face": "#0b0b0b", "ink": "#f4f4f4", "needle": "#ff5a1f", "red": "#e8231b", "bezel": "#2b2b2b", "accent": "#ffcf33", "tachMax": 9000, "speedMax": 240, "font": "sans"}},
-    {"id": "acr_131_abarth", "name": "Fiat 131 Abarth 1976", "family": "analog", "games": ["Rally"], "match": ["131", "fiat"],
-     "theme": {"face": "#101010", "ink": "#ececec", "needle": "#ffffff", "red": "#d7261e", "bezel": "#9a9a9a", "accent": "#e8e8e8", "tachMax": 10000, "speedMax": 220, "font": "serif"}},
-    {"id": "acr_alfa_gta", "name": "Alfa Romeo GTA 1300 Junior 1972", "family": "analog", "games": ["Rally"], "match": ["gta", "alfa", "giulia"],
-     "theme": {"face": "#f2ead8", "ink": "#151515", "needle": "#c81e1e", "red": "#c81e1e", "bezel": "#c9c9c9", "accent": "#e9dfc6", "tachMax": 8000, "speedMax": 220, "font": "serif"}}
-  ]
+  {
+   "id": "gt3_generic",
+   "name": "GT3 générique",
+   "family": "gt3",
+   "games": [
+    "Le Mans",
+    "ACC"
+   ],
+   "match": [],
+   "theme": {
+    "accent": "#ffb000",
+    "bg": "#000000",
+    "panel": "#111111",
+    "text": "#f2f2f2",
+    "gear": "#ffffff",
+    "leds": "lr",
+    "font": "mono",
+    "layout": "A"
+   },
+   "cat": "Génériques"
+  },
+  {
+   "id": "lmu_ferrari_296",
+   "name": "Ferrari 296 LMGT3",
+   "family": "gt3",
+   "games": [
+    "Le Mans"
+   ],
+   "match": [
+    "ferrari",
+    "296",
+    "af corse"
+   ],
+   "theme": {
+    "accent": "#ff2a1a",
+    "bg": "#000000",
+    "panel": "#161010",
+    "text": "#ffffff",
+    "gear": "#ffde00",
+    "leds": "center",
+    "font": "sans",
+    "layout": "A",
+    "ledShape": "dot"
+   },
+   "cat": "Par voiture · LMU GT3"
+  },
+  {
+   "id": "lmu_porsche_911",
+   "name": "Porsche 911 GT3 R LMGT3",
+   "family": "gt3",
+   "games": [
+    "Le Mans"
+   ],
+   "match": [
+    "porsche",
+    "911",
+    "manthey"
+   ],
+   "theme": {
+    "accent": "#e6e6e6",
+    "bg": "#050505",
+    "panel": "#141414",
+    "text": "#ffffff",
+    "gear": "#ffffff",
+    "leds": "lr",
+    "font": "sans",
+    "layout": "B",
+    "ledShape": "bar",
+    "warn": "#ff3b30"
+   },
+   "cat": "Par voiture · LMU GT3"
+  },
+  {
+   "id": "lmu_bmw_m4",
+   "name": "BMW M4 LMGT3",
+   "family": "grid",
+   "games": [
+    "Le Mans"
+   ],
+   "match": [
+    "bmw",
+    "m4 ",
+    "wrt"
+   ],
+   "theme": {
+    "bg": "#2a2a2a",
+    "border": "#9a9a9a",
+    "text": "#e8e8e8",
+    "gear": "#22e022",
+    "tyre": "#c9c900",
+    "shiftCol": "#ffffff"
+   },
+   "cat": "Par voiture · LMU GT3"
+  },
+  {
+   "id": "lmu_aston_vantage",
+   "name": "Aston Martin Vantage AMR LMGT3",
+   "family": "gt3",
+   "games": [
+    "Le Mans"
+   ],
+   "match": [
+    "aston",
+    "vantage",
+    "heart of racing"
+   ],
+   "theme": {
+    "accent": "#00a86b",
+    "bg": "#020604",
+    "panel": "#0b1711",
+    "text": "#eafff4",
+    "gear": "#c8ff3d",
+    "leds": "center",
+    "font": "sans",
+    "layout": "A",
+    "ledShape": "dot"
+   },
+   "cat": "Par voiture · LMU GT3"
+  },
+  {
+   "id": "lmu_corvette_z06",
+   "name": "Corvette Z06 LMGT3.R",
+   "family": "gt3",
+   "games": [
+    "Le Mans"
+   ],
+   "match": [
+    "corvette",
+    "z06"
+   ],
+   "theme": {
+    "accent": "#ffd500",
+    "bg": "#000000",
+    "panel": "#15140a",
+    "text": "#ffffff",
+    "gear": "#ffd500",
+    "leds": "lr",
+    "font": "mono",
+    "layout": "B",
+    "ledShape": "bar"
+   },
+   "cat": "Par voiture · LMU GT3"
+  },
+  {
+   "id": "lmu_ford_mustang",
+   "name": "Ford Mustang LMGT3",
+   "family": "gt3",
+   "games": [
+    "Le Mans"
+   ],
+   "match": [
+    "ford",
+    "mustang"
+   ],
+   "theme": {
+    "accent": "#2f7bff",
+    "bg": "#02040a",
+    "panel": "#0c1222",
+    "text": "#ffffff",
+    "gear": "#ffffff",
+    "leds": "center",
+    "font": "mono",
+    "layout": "B",
+    "ledShape": "dot"
+   },
+   "cat": "Par voiture · LMU GT3"
+  },
+  {
+   "id": "lmu_lambo_huracan",
+   "name": "Lamborghini Huracán LMGT3 Evo2",
+   "family": "gt3",
+   "games": [
+    "Le Mans"
+   ],
+   "match": [
+    "lamborghini",
+    "huracan",
+    "huracán"
+   ],
+   "theme": {
+    "accent": "#9bff00",
+    "bg": "#000000",
+    "panel": "#101508",
+    "text": "#ffffff",
+    "gear": "#ff9d00",
+    "leds": "lr",
+    "font": "sans",
+    "layout": "A",
+    "ledShape": "chevron"
+   },
+   "cat": "Par voiture · LMU GT3"
+  },
+  {
+   "id": "lmu_lexus_rcf",
+   "name": "Lexus RC F LMGT3",
+   "family": "gt3",
+   "games": [
+    "Le Mans"
+   ],
+   "match": [
+    "lexus",
+    "rc f",
+    "rcf",
+    "akkodis"
+   ],
+   "theme": {
+    "accent": "#ff6a13",
+    "bg": "#000000",
+    "panel": "#17100a",
+    "text": "#ffffff",
+    "gear": "#ffffff",
+    "leds": "center",
+    "font": "mono",
+    "layout": "A",
+    "ledShape": "bar"
+   },
+   "cat": "Par voiture · LMU GT3"
+  },
+  {
+   "id": "lmu_mclaren_720s",
+   "name": "McLaren 720S LMGT3 Evo",
+   "family": "gt3",
+   "games": [
+    "Le Mans"
+   ],
+   "match": [
+    "mclaren",
+    "720s",
+    "united autosports"
+   ],
+   "theme": {
+    "accent": "#ff8000",
+    "bg": "#000000",
+    "panel": "#160d04",
+    "text": "#ffffff",
+    "gear": "#ff8000",
+    "leds": "lr",
+    "font": "sans",
+    "layout": "B",
+    "ledShape": "dot"
+   },
+   "cat": "Par voiture · LMU GT3"
+  },
+  {
+   "id": "lmu_mercedes_amg",
+   "name": "Mercedes-AMG LMGT3",
+   "family": "gt3",
+   "games": [
+    "Le Mans"
+   ],
+   "match": [
+    "mercedes",
+    "amg"
+   ],
+   "theme": {
+    "accent": "#00d2be",
+    "bg": "#000000",
+    "panel": "#071413",
+    "text": "#ffffff",
+    "gear": "#ffffff",
+    "leds": "center",
+    "font": "mono",
+    "layout": "A",
+    "ledShape": "bar"
+   },
+   "cat": "Par voiture · LMU GT3"
+  },
+  {
+   "id": "rally_generic",
+   "name": "Rallye générique",
+   "family": "rally",
+   "games": [
+    "Rally"
+   ],
+   "match": [],
+   "theme": {
+    "accent": "#ffcc00",
+    "bg": "#000000",
+    "panel": "#121212",
+    "text": "#ffffff",
+    "gear": "#ffffff",
+    "leds": "lr",
+    "font": "mono"
+   },
+   "cat": "Génériques"
+  },
+  {
+   "id": "acr_i20_rally2",
+   "name": "Hyundai i20 N Rally2",
+   "family": "bands",
+   "games": [
+    "Rally"
+   ],
+   "match": [
+    "i20",
+    "hyundai"
+   ],
+   "theme": {
+    "bands": [
+     "#00e13c",
+     "#ffd000",
+     "#ff1a0d"
+    ],
+    "sideW": 0.13,
+    "start": 0.6,
+    "shift": 0.96,
+    "bg": "#050505",
+    "off": "#0e0e0e",
+    "box": "#b3261a",
+    "gear": "#7ce000",
+    "text": "#ffffff",
+    "boxSize": 210,
+    "boxY": 62,
+    "rpmSize": 66
+   },
+   "cat": "Par voiture · AC Rally"
+  },
+  {
+   "id": "acr_208_rally4",
+   "name": "Peugeot 208 Rally4",
+   "family": "rally",
+   "games": [
+    "Rally"
+   ],
+   "match": [
+    "208"
+   ],
+   "theme": {
+    "accent": "#c8ff00",
+    "bg": "#000000",
+    "panel": "#10140a",
+    "text": "#ffffff",
+    "gear": "#c8ff00",
+    "leds": "center",
+    "font": "mono"
+   },
+   "cat": "Par voiture · AC Rally"
+  },
+  {
+   "id": "acr_fabia_rally2",
+   "name": "Škoda Fabia Rally2",
+   "family": "rally",
+   "games": [
+    "Rally"
+   ],
+   "match": [
+    "fabia",
+    "skoda",
+    "škoda"
+   ],
+   "theme": {
+    "accent": "#4ba82e",
+    "bg": "#000000",
+    "panel": "#0b1409",
+    "text": "#ffffff",
+    "gear": "#ffffff",
+    "leds": "lr",
+    "font": "sans"
+   },
+   "cat": "Par voiture · AC Rally"
+  },
+  {
+   "id": "acr_xsara_wrc",
+   "name": "Citroën Xsara WRC 2003",
+   "family": "lcd",
+   "games": [
+    "Rally"
+   ],
+   "match": [
+    "xsara",
+    "citroen",
+    "citroën"
+   ],
+   "theme": {
+    "accent": "#1d2a1a",
+    "bg": "#9fb28a",
+    "panel": "#8da078",
+    "text": "#11170e",
+    "lcdOff": "rgba(17,23,14,0.08)",
+    "backlight": "#b9cfa0"
+   },
+   "cat": "Par voiture · AC Rally"
+  },
+  {
+   "id": "acr_306_maxi",
+   "name": "Peugeot 306 Maxi Kit Car",
+   "family": "lcd",
+   "games": [
+    "Rally"
+   ],
+   "match": [
+    "306"
+   ],
+   "theme": {
+    "accent": "#2a1700",
+    "bg": "#d08a1c",
+    "panel": "#b97616",
+    "text": "#1c0f00",
+    "lcdOff": "rgba(28,15,0,0.10)",
+    "backlight": "#f0a430"
+   },
+   "cat": "Par voiture · AC Rally"
+  },
+  {
+   "id": "acr_impreza_93",
+   "name": "Subaru Impreza 555 Gr.A 1993",
+   "family": "lcd",
+   "games": [
+    "Rally"
+   ],
+   "match": [
+    "impreza",
+    "subaru"
+   ],
+   "theme": {
+    "accent": "#071420",
+    "bg": "#7fb2c9",
+    "panel": "#6d9fb6",
+    "text": "#06121c",
+    "lcdOff": "rgba(6,18,28,0.09)",
+    "backlight": "#a6d4ea"
+   },
+   "cat": "Par voiture · AC Rally"
+  },
+  {
+   "id": "acr_delta_integrale",
+   "name": "Lancia Delta HF Integrale Evo",
+   "family": "analog",
+   "games": [
+    "Rally"
+   ],
+   "match": [
+    "delta",
+    "lancia",
+    "integrale"
+   ],
+   "theme": {
+    "face": "#0b0b0b",
+    "ink": "#f4f4f4",
+    "needle": "#ff5a1f",
+    "red": "#e8231b",
+    "bezel": "#2b2b2b",
+    "accent": "#ffcf33",
+    "tachMax": 9000,
+    "speedMax": 240,
+    "font": "sans"
+   },
+   "cat": "Par voiture · AC Rally"
+  },
+  {
+   "id": "acr_131_abarth",
+   "name": "Fiat 131 Abarth 1976",
+   "family": "analog",
+   "games": [
+    "Rally"
+   ],
+   "match": [
+    "131",
+    "fiat"
+   ],
+   "theme": {
+    "face": "#101010",
+    "ink": "#ececec",
+    "needle": "#ffffff",
+    "red": "#d7261e",
+    "bezel": "#9a9a9a",
+    "accent": "#e8e8e8",
+    "tachMax": 10000,
+    "speedMax": 220,
+    "font": "serif"
+   },
+   "cat": "Par voiture · AC Rally"
+  },
+  {
+   "id": "acr_alfa_gta",
+   "name": "Alfa Romeo GTA 1300 Junior 1972",
+   "family": "analog",
+   "games": [
+    "Rally"
+   ],
+   "match": [
+    "gta",
+    "alfa",
+    "giulia"
+   ],
+   "theme": {
+    "face": "#f2ead8",
+    "ink": "#151515",
+    "needle": "#c81e1e",
+    "red": "#c81e1e",
+    "bezel": "#c9c9c9",
+    "accent": "#e9dfc6",
+    "tachMax": 8000,
+    "speedMax": 220,
+    "font": "serif"
+   },
+   "cat": "Par voiture · AC Rally"
+  },
+  {
+   "id": "d169_gt3oem",
+   "name": "GT3 d'origine (écran OEM)",
+   "family": "gt3oem",
+   "aspect": "16:9",
+   "games": [],
+   "match": [],
+   "theme": {
+    "label": "#9aa3ad",
+    "gear": "#ffffff"
+   },
+   "cat": "GT / Tourisme"
+  },
+  {
+   "id": "d169_logger",
+   "name": "Logger arc (AiM style)",
+   "family": "loggerArc",
+   "aspect": "16:9",
+   "games": [],
+   "match": [],
+   "theme": {
+    "accent": "#3fa9ff",
+    "label": "#ffd400"
+   },
+   "cat": "Club / Karting"
+  },
+  {
+   "id": "d169_proto",
+   "name": "Volant proto / LMP",
+   "family": "protoWheel",
+   "aspect": "16:9",
+   "games": [],
+   "match": [],
+   "theme": {},
+   "cat": "Endurance / Proto"
+  },
+  {
+   "id": "d169_wide",
+   "name": "Écran large (voies + chronos)",
+   "family": "wideLogger",
+   "aspect": "16:9",
+   "games": [],
+   "match": [],
+   "theme": {
+    "accent": "#ffb000"
+   },
+   "cat": "GT / Tourisme"
+  },
+  {
+   "id": "d169_rally",
+   "name": "Rallye moderne Rally1/Rally2",
+   "family": "rallyModern",
+   "aspect": "16:9",
+   "games": [],
+   "match": [],
+   "theme": {
+    "accent": "#ff7a00"
+   },
+   "cat": "Rallye"
+  },
+  {
+   "id": "d169_formula",
+   "name": "Monoplace (volant formule)",
+   "family": "formula",
+   "aspect": "16:9",
+   "games": [],
+   "match": [],
+   "theme": {},
+   "cat": "Formule"
+  },
+  {
+   "id": "d169_night",
+   "name": "Endurance nuit (faible lumière)",
+   "family": "enduranceNight",
+   "aspect": "16:9",
+   "games": [],
+   "match": [],
+   "theme": {
+    "accent": "#ff5a1f"
+   },
+   "cat": "Endurance / Proto"
+  },
+  {
+   "id": "d169_road",
+   "name": "Combiné numérique (route)",
+   "family": "roadCluster",
+   "aspect": "16:9",
+   "games": [],
+   "match": [],
+   "theme": {
+    "accent": "#35c8ff"
+   },
+   "cat": "Route"
+  },
+  {
+   "id": "d169_vfd",
+   "name": "Rétro fluorescent (années 80-90)",
+   "family": "retroVFD",
+   "aspect": "16:9",
+   "games": [],
+   "match": [],
+   "theme": {
+    "accent": "#38ffd0"
+   },
+   "cat": "Rétro"
+  },
+  {
+   "id": "d169_minimal",
+   "name": "Minimal (rapport géant)",
+   "family": "minimal",
+   "aspect": "16:9",
+   "cat": "Minimaliste",
+   "games": [],
+   "match": [],
+   "theme": {}
+  },
+  {
+   "id": "d169_coach",
+   "name": "Coach delta",
+   "family": "coachDelta",
+   "aspect": "16:9",
+   "cat": "Minimaliste",
+   "games": [],
+   "match": [],
+   "theme": {}
+  },
+  {
+   "id": "d169_drift",
+   "name": "Drift néon",
+   "family": "driftNeon",
+   "aspect": "16:9",
+   "cat": "Drift / Fun",
+   "games": [],
+   "match": [],
+   "theme": {
+    "accent": "#ff2bd6"
+   }
+  },
+  {
+   "id": "d169_kart",
+   "name": "Karting / club (chrono)",
+   "family": "kart",
+   "aspect": "16:9",
+   "cat": "Club / Karting",
+   "games": [],
+   "match": [],
+   "theme": {}
+  },
+  {
+   "id": "d169_cup",
+   "name": "Cup car",
+   "family": "cupCar",
+   "aspect": "16:9",
+   "cat": "GT / Tourisme",
+   "games": [],
+   "match": [],
+   "theme": {}
+  },
+  {
+   "id": "d169_hyper",
+   "name": "Hypercar (énergie)",
+   "family": "hypercar",
+   "aspect": "16:9",
+   "cat": "Endurance / Proto",
+   "games": [],
+   "match": [],
+   "theme": {
+    "accent": "#00e1ff"
+   }
+  },
+  {
+   "id": "d169_touring",
+   "name": "Tourisme plein jour (fond clair)",
+   "family": "touringDay",
+   "aspect": "16:9",
+   "cat": "GT / Tourisme",
+   "games": [],
+   "match": [],
+   "theme": {
+    "gear": "#ffd400"
+   }
+  },
+  {
+   "id": "d169_stock",
+   "name": "Stock car",
+   "family": "stockCar",
+   "aspect": "16:9",
+   "cat": "Club / Karting",
+   "games": [],
+   "match": [],
+   "theme": {}
+  },
+  {
+   "id": "d169_fuel",
+   "name": "Stratégie carburant",
+   "family": "fuelStrategy",
+   "aspect": "16:9",
+   "cat": "Ingénieur",
+   "games": [],
+   "match": [],
+   "theme": {}
+  },
+  {
+   "id": "d169_tyres",
+   "name": "Pneus & freins",
+   "family": "tyreMonitor",
+   "aspect": "16:9",
+   "cat": "Ingénieur",
+   "games": [],
+   "match": [],
+   "theme": {}
+  },
+  {
+   "id": "d169_pedals",
+   "name": "Pédales (coaching)",
+   "family": "pedals",
+   "aspect": "16:9",
+   "cat": "Ingénieur",
+   "games": [],
+   "match": [],
+   "theme": {}
+  },
+  {
+   "id": "d169_synth",
+   "name": "Synthwave",
+   "family": "synthwave",
+   "aspect": "16:9",
+   "cat": "Drift / Fun",
+   "games": [],
+   "match": [],
+   "theme": {}
+  }
+ ],
+ "categories": [
+  "GT / Tourisme",
+  "Endurance / Proto",
+  "Formule",
+  "Rallye",
+  "Club / Karting",
+  "Route",
+  "Minimaliste",
+  "Ingénieur",
+  "Rétro",
+  "Drift / Fun",
+  "Button box",
+  "Par voiture · LMU GT3",
+  "Par voiture · AC Rally",
+  "Génériques",
+  "Mes dashboards perso"
+ ]
 }

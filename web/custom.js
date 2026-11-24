@@ -243,23 +243,27 @@
 
   function draw(c, d, dash, pageIdx, t) {
     const page = (dash.pages || [])[pageIdx] || (dash.pages || [])[0] || { widgets: [] };
-    c.fillStyle = page.bg || dash.bg || "#000"; c.fillRect(0, 0, W, H);
+    c.fillStyle = page.bg || dash.bg || "#000"; c.fillRect(0, 0, dash.w || W, dash.h || H);
     d._page = pageIdx;
     for (const w of page.widgets) {
       if (!visible(w, d)) continue;
-      const fn = R[w.type]; if (!fn) continue;
-      c.save(); if (w.opacity !== undefined && w.opacity !== "") c.globalAlpha = +w.opacity;
-      try { fn(c, w, d, t); } catch (e) { /* widget mal configure : on ignore */ }
-      c.restore();
+      drawWidget(c, w, d, t);
     }
   }
   function hit(dash, pageIdx, x, y) {
     const page = (dash.pages || [])[pageIdx] || { widgets: [] };
     for (let i = page.widgets.length - 1; i >= 0; i--) {
       const w = page.widgets[i];
-      if (w.type === "button" && x >= w.x && x <= w.x + w.w && y >= w.y && y <= w.y + w.h) return w;
+      if ((w.type === "button" || w.type === "switch") && x >= w.x && x <= w.x + w.w && y >= w.y && y <= w.y + w.h) return w;
     }
     return null;
   }
-  window.RSIMC = { W, H, FONT_LIST, FIELDS, DEFAULTS, draw, hit, val, fmt, loadFonts };
+  function drawWidget(c, w, d, t) {
+    const fn = R[w.type]; if (!fn) return;
+    c.save(); if (w.opacity !== undefined && w.opacity !== "") c.globalAlpha = +w.opacity;
+    try { fn(c, w, d, t); } catch (e) { }
+    c.restore();
+  }
+  window.RSIMC = { W, H, FONT_LIST, FIELDS, DEFAULTS, draw, hit, val, fmt, loadFonts, drawWidget,
+    R, H_: { rrect, frame, txt, alignX, rule, test, visible, ledColors, fontCss, isNil } };
 })();

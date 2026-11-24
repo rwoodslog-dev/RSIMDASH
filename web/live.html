@@ -32,7 +32,6 @@
     <option value="off">Libre (rotation auto)</option>
   </select>
   <small id="lockinfo"></small>
-  <button id="edit">✎ Modifier ce dashboard</button>
   <button id="home">⌂ Accueil RSIM</button>
   <button id="close">Fermer</button>
 </div>
@@ -40,9 +39,13 @@
 <script src="dash.js"></script>
 <script src="custom.js"></script>
 <script src="widgets.js"></script>
+<script src="dash169.js"></script>
+<script src="dash169b.js"></script>
 <script>
 "use strict";
 const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+var LW = 1000, LH = 450;   // taille logique du dash affiche (1000x450 ou 1600x900 pour les 16:9)
+function setLogical(w, h) { if (w !== LW || h !== LH) { LW = w; LH = h; resize(); } }
 let cars = { profiles: [] }, frame = { connected: false }, view = null, lastMsg = 0;
 RSIMC.loadFonts();
 /* dashboards perso : charges a la demande, recharges quand on enregistre dans l'editeur */
@@ -88,10 +91,10 @@ function resize() {
   const dpr = window.devicePixelRatio || 1;
   let sw = innerWidth, sh = innerHeight;
   if (comp === 90 || comp === 270) [sw, sh] = [sh, sw];
-  const s = Math.min(sw / RSIM.W, sh / RSIM.H);
-  cv.style.width = RSIM.W * s + "px"; cv.style.height = RSIM.H * s + "px";
-  cv.width = Math.round(RSIM.W * s * dpr); cv.height = Math.round(RSIM.H * s * dpr);
-  ctx.setTransform(cv.width / RSIM.W, 0, 0, cv.height / RSIM.H, 0, 0);
+  const s = Math.min(sw / LW, sh / LH);
+  cv.style.width = LW * s + "px"; cv.style.height = LH * s + "px";
+  cv.width = Math.round(LW * s * dpr); cv.height = Math.round(LH * s * dpr);
+  ctx.setTransform(cv.width / LW, 0, 0, cv.height / LH, 0, 0);
 }
 addEventListener("resize", resize); resize();
 
@@ -124,17 +127,20 @@ function smooth(target) {
 
 function loop(ts) {
   const t = ts / 1000;
-  ctx.clearRect(0, 0, RSIM.W, RSIM.H);
+  ctx.clearRect(0, 0, LW, LH);
   if (!frame.connected || performance.now() - lastMsg > 3000) {
+    setLogical(RSIM.W, RSIM.H);
     RSIM.drawWaiting(ctx, t, location.host);
   } else {
     const d = smooth(frame);
     if (d.profile && d.profile.startsWith("custom:")) {
       const dsh = getCustom(d.profile.slice(7));
-      if (dsh && dsh.pages) { pressMark(dsh); RSIMC.draw(ctx, d, dsh, d.page || 0, t); requestAnimationFrame(loop); return; }
+      if (dsh && dsh.pages) { setLogical(dsh.w || RSIM.W, dsh.h || RSIM.H); pressMark(dsh); RSIMC.draw(ctx, d, dsh, d.page || 0, t); requestAnimationFrame(loop); return; }
     }
     const p = cars.profiles.find(x => x.id === d.profile) || cars.profiles.find(x => x.id === "universal");
     const fam = p ? RSIM.FAMILIES[p.family] : null;
+    const asp = p && RSIM.ASPECT && RSIM.ASPECT[p.family];
+    setLogical(asp ? asp[0] : RSIM.W, asp ? asp[1] : RSIM.H);
     if (fam) fam(ctx, d, p.theme, t); else RSIM.drawWaiting(ctx, t, "profil inconnu : " + d.profile);
   }
   requestAnimationFrame(loop);
@@ -169,7 +175,7 @@ function toCanvas(e) {
   let nx = (e.clientX - (r.left + r.width / 2)), ny = (e.clientY - (r.top + r.height / 2));
   const a = -comp * Math.PI / 180, rx = nx * Math.cos(a) - ny * Math.sin(a), ry = nx * Math.sin(a) + ny * Math.cos(a);
   const sw = (comp === 90 || comp === 270) ? r.height : r.width, sh = (comp === 90 || comp === 270) ? r.width : r.height;
-  return [(rx / sw + 0.5) * RSIM.W, (ry / sh + 0.5) * RSIM.H];
+  return [(rx / sw + 0.5) * LW, (ry / sh + 0.5) * LH];
 }
 function pressMark(dsh) { if (lastPress && lastPress.dash === dsh) { const w = RSIMC.hit(dsh, frame.page || 0, lastPress.x, lastPress.y); if (w) w._pressed = lastPress.t; } }
 const sendAct = a => fetch("api/action", { method: "POST", body: JSON.stringify({ action: a }) });
@@ -207,9 +213,6 @@ function openMenu() {
   document.getElementById("menu").style.display = "block";
 }
 document.getElementById("orient").onchange = e => { orientPref = e.target.value; localStorage.setItem("orient", orientPref); lockOrient(); };
-document.getElementById("edit").onclick = () => {
-  const p = frame.profile || ""; location.href = p.startsWith("custom:") ? "editor.html?id=" + encodeURIComponent(p.slice(7)) : "editor.html?new=1";
-};
 document.getElementById("home").onclick = () => location.href = "index.html";
 document.getElementById("close").onclick = () => document.getElementById("menu").style.display = "none";
 document.getElementById("save").onclick = () => {

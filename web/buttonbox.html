@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e12">
+<link rel="icon" href="icon-192.png">
+<title>RSIM · Button box</title>
+<style>
+  :root { --bg:#0b0e12; --p:#11161d; --p2:#161c24; --b:#232c37; --t:#e6edf3; --m:#8fa3b5; --a:#3fd0ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--t); font:14px/1.4 "Segoe UI", Roboto, sans-serif; }
+  header { display:flex; align-items:center; gap:12px; padding:12px 18px; background:var(--p); border-bottom:1px solid var(--b); flex-wrap:wrap; }
+  header a { color:var(--a); text-decoration:none; font-weight:600; } header h1 { margin:0; font-size:18px; }
+  input, select, button { font:inherit; color:var(--t); background:var(--p2); border:1px solid var(--b); border-radius:8px; padding:7px 9px; }
+  button { cursor:pointer; } .pri { background:#1d6fe0; border-color:#1d6fe0; }
+  main { display:grid; grid-template-columns: minmax(0, 1fr) 560px; gap:16px; padding:16px 18px; }
+  @media (max-width:1100px) { main { grid-template-columns: 1fr; } }
+  canvas { width:100%; background:#000; border-radius:10px; aspect-ratio:16/9; display:block; cursor:pointer; }
+  .list { display:grid; gap:8px; align-content:start; }
+  .it { background:var(--p); border:1px solid var(--b); border-radius:10px; padding:10px; display:grid; grid-template-columns: 1fr 1fr 1fr 1.1fr; gap:6px; align-items:center; }
+  .it.on { border-color:var(--a); box-shadow:0 0 0 1px var(--a); }
+  .it .t { grid-column:1/-1; display:flex; justify-content:space-between; align-items:center; font-weight:600; }
+  .it .t small { color:var(--m); font-weight:400; }
+  .hint { color:var(--m); font-size:13px; } code { color:#ffd58a; }
+  .toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#1d6fe0; padding:8px 16px; border-radius:8px; display:none; }
+</style>
+</head>
+<body>
+<header>
+  <a href="hub.html">← Dashboards</a><h1>Button box : assigner les touches</h1>
+  <select id="box"></select>
+  <button class="pri" id="bSave">Enregistrer</button>
+  <button id="bShow">Afficher sur le téléphone</button>
+  <button id="bReset">Revenir aux touches d'origine</button>
+</header>
+<main>
+  <div>
+    <canvas id="cv" width="1600" height="900"></canvas>
+    <p class="hint">Clique sur un bouton de l'aperçu pour le retrouver dans la liste. Dans le jeu, assigne <b>la même touche</b> à la commande voulue
+      (ex. démarreur = <code>LCTRL+F2</code>), ou choisis ici la touche que ton jeu utilise déjà.
+      « Maintenu » = la touche reste enfoncée tant que le doigt est posé (démarreur, frein à main, appel de phares).</p>
+  </div>
+  <div class="list" id="list"></div>
+</main>
+<div class="toast" id="toast"></div>
+<script src="api.js"></script>
+<script src="dash.js"></script>
+<script src="custom.js"></script>
+<script src="widgets.js"></script>
+<script>
+"use strict";
+if (RSIMAPI.needsSetup) location.href = "settings.html?first=1";
+const $ = id => document.getElementById(id);
+const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 2000); };
+const cv = $("cv"), ctx = cv.getContext("2d");
+const MODS = [["", "—"], ["LCTRL", "Ctrl"], ["LSHIFT", "Maj"], ["LALT", "Alt"], ["RCTRL", "Ctrl droit"], ["RALT", "Alt Gr"]];
+const ACTS = [["key", "Touche → jeu"], ["page_next", "Page suivante"], ["dash_next", "Dashboard suivant"], ["dash_prev", "Dashboard précédent"], ["dash_auto", "Dashboard auto"]];
+let KEYS = [], dash = null, selW = null, dirty = false;
+RSIMC.loadFonts();
+function sel(opts, v, set) { const s = document.createElement("select");
+  opts.forEach(o => { const [a, b] = Array.isArray(o) ? o : [o, o]; const op = document.createElement("option"); op.value = a; op.textContent = b; s.appendChild(op); });
+  s.value = v ?? ""; s.onchange = () => { set(s.value); dirty = true; }; return s; }
+const inter = () => dash.pages.flatMap(p => p.widgets).filter(w => w.type === "button" || w.type === "switch");
+const combo = (w, sfx = "") => [w["mod1" + sfx], w["mod2" + sfx], w["key" + sfx]].filter(Boolean).join(" + ") || "—";
+function renderList() {
+  const L = $("list"); L.innerHTML = "";
+  inter().forEach(w => {
+    const it = document.createElement("div"); it.className = "it" + (w === selW ? " on" : "");
+    const name = w.text || (w.type === "switch" ? "Interrupteur" : "Bouton");
+    const t = document.createElement("div"); t.className = "t";
+    t.innerHTML = `<span>${w.type === "switch" ? "⏻" : "●"} ${name}</span><small>${(w.act || "key") === "key" ? combo(w) : ACTS.find(a => a[0] === w.act)?.[1] || w.act}</small>`;
+    it.appendChild(t);
+    it.appendChild(sel(ACTS, w.act || "key", v => { w.act = v; renderList(); }));
+    if ((w.act || "key") === "key") {
+      it.appendChild(sel(MODS, w.mod1 || "", v => { w.mod1 = v || undefined; renderList(); }));
+      it.appendChild(sel(MODS, w.mod2 || "", v => { w.mod2 = v || undefined; renderList(); }));
+      it.appendChild(sel([["", "touche…"], ...KEYS], w.key || "", v => { w.key = v || undefined; renderList(); }));
+      if (w.type === "button") it.appendChild(sel([["press", "À l'appui"], ["release", "Au relâchement"], ["hold", "Maintenu"]], w.when || "press", v => w.when = v));
+      if (w.type === "switch") {
+        const c = document.createElement("label"); c.className = "hint";
+        const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!w.altOff; cb.onchange = () => { w.altOff = cb.checked; dirty = true; renderList(); };
+        c.append(cb, " touche différente sur OFF"); it.appendChild(c);
+        if (w.altOff) { it.appendChild(sel(MODS, w.mod1Off || "", v => w.mod1Off = v || undefined)); it.appendChild(sel([["", "touche OFF…"], ...KEYS], w.keyOff || "", v => w.keyOff = v || undefined)); }
+      }
+    }
+    const tb = document.createElement("button"); tb.textContent = "Tester";
+    tb.onclick = async () => { const acts = [...RSIMC.pressActions(w, "down", {}), ...RSIMC.pressActions(w, "up", {})];
+      for (const a of acts) await fetch("api/action", { method: "POST", body: JSON.stringify({ action: a }) }); toast(acts.length ? "Envoyé au PC : " + acts.join(", ") : "Rien à envoyer"); };
+    it.appendChild(tb);
+    it.onclick = e => { if (e.target.tagName === "DIV" || e.target.tagName === "SPAN") { selW = w; renderList(); } };
+    L.appendChild(it);
+    if (w === selW) setTimeout(() => it.scrollIntoView({ block: "nearest", behavior: "smooth" }), 0);
+  });
+}
+cv.onclick = e => { const r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * 1600 / r.width, y = (e.clientY - r.top) * 900 / r.height;
+  const w = RSIMC.hit(dash, 0, x, y); if (w) { selW = w; renderList(); } };
+async function openBox(id) {
+  if (dirty && !confirm("Modifications non enregistrées. Continuer ?")) return;
+  dash = await (await fetch("api/dashboard?id=" + encodeURIComponent(id))).json(); selW = null; dirty = false; renderList();
+  history.replaceState(null, "", "?id=" + encodeURIComponent(id));
+}
+$("bSave").onclick = async () => { const clean = JSON.parse(JSON.stringify(dash, (k, v) => k.startsWith("_") ? undefined : v));
+  await fetch("api/dashboard", { method: "POST", body: JSON.stringify(clean) }); dirty = false; toast("Touches enregistrées ✔ (le téléphone se met à jour)"); };
+$("bShow").onclick = async () => { await fetch("api/action", { method: "POST", body: JSON.stringify({ action: "dash:custom:" + dash.id }) }); toast("Affiché sur le téléphone"); };
+$("bReset").onclick = async () => { if (!confirm("Revenir aux touches d'origine de cette button box ?")) return;
+  await fetch("api/dashboard/delete", { method: "POST", body: JSON.stringify({ id: dash.id }) }); dirty = false; openBox(dash.id); toast("Touches d'origine restaurées"); };
+$("box").onchange = e => openBox(e.target.value);
+const demo = { connected: true, gear: 3, rpm: 6800, maxRpm: 8000, speed: 142, delta: -0.18, fuel: 42, fuelLaps: 12, cur: 52.3, last: 89.4, tc: 3, abs: 2, map: 1, bb: 52.4, water: 90, turbo: 1.3,
+  tyreT: [70, 85, 92, 101], tyreP: [1.7, 1.7, 1.7, 1.7], absActive: false, tcActive: false, limiter: false, pos: 4 };
+function loop(ts) { if (dash) { RSIMC.draw(ctx, JSON.parse(JSON.stringify(demo)), dash, 0, ts / 1000);
+  if (selW) { ctx.save(); ctx.strokeStyle = "#3fd0ff"; ctx.lineWidth = 6; ctx.setLineDash([14, 8]); ctx.strokeRect(selW.x - 6, selW.y - 6, selW.w + 12, selW.h + 12); ctx.restore(); } }
+  requestAnimationFrame(loop); }
+(async () => {
+  KEYS = (await (await fetch("api/bindings")).json()).keys || [];
+  const list = await (await fetch("api/dashboards")).json(), boxes = [];
+  for (const x of list) { const d = await (await fetch("api/dashboard?id=" + encodeURIComponent(x.id))).json(); if (d.category === "Button box") boxes.push(d); }
+  boxes.forEach(b => { const o = document.createElement("option"); o.value = b.id; o.textContent = b.name; $("box").appendChild(o); });
+  const q = new URLSearchParams(location.search).get("id");
+  if (boxes.length) { $("box").value = q && boxes.some(b => b.id === q) ? q : boxes[0].id; await openBox($("box").value); }
+  requestAnimationFrame(loop);
+})();
+addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+</script>
+</body>
+</html>

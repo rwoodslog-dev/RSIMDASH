@@ -24,6 +24,8 @@
   button, select, input { font:inherit; color:var(--t); background:var(--p2); border:1px solid var(--b); border-radius:7px; padding:6px 10px; }
   button { cursor:pointer; } button:hover { border-color:var(--a); }
   .pri { background:#1d6fe0; border-color:#1d6fe0; } .dan { background:#4a1a1a; border-color:#6a2525; }
+  .cats { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; align-items:center; }
+  .cats button { border-radius:20px; padding:6px 14px; } .cats button.on { background:#1d6fe0; border-color:#1d6fe0; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:14px; margin-bottom:28px; }
   .card { background:var(--p); border:1px solid var(--b); border-radius:12px; overflow:hidden; }
   .card.cur { border-color:var(--g); box-shadow:0 0 0 1px var(--g); }
@@ -57,10 +59,8 @@
 </header>
 <main>
   <section id="s-dashes" class="on">
-    <h2>Mes dashboards <button class="pri" id="bNew">+ Créer un dashboard</button> <button id="bAuto">Revenir au dash automatique</button></h2>
-    <div class="grid" id="gCustom"></div>
-    <h2>Dashboards intégrés</h2>
-    <div class="grid" id="gBuilt"></div>
+    <div class="cats" id="cats"></div>
+    <div id="gAll"></div>
   </section>
 
   <section id="s-cars">
@@ -89,7 +89,7 @@
   <section id="s-buttons">
     <h2>Boutons du volant</h2>
     <p style="color:var(--m)">Les boutons du G29 (ou de la Moza / button box) peuvent changer de page, de dashboard, ou envoyer une touche au jeu.</p>
-    <button class="pri" onclick="location.href='editor.html?tab=binds'">Configurer les boutons</button>
+    <button class="pri" onclick="location.href='buttons.html'">Configurer les boutons</button>
     <div id="bindList" style="margin-top:14px"></div>
   </section>
 </main>
@@ -99,6 +99,8 @@
 <script src="dash.js"></script>
 <script src="custom.js"></script>
 <script src="widgets.js"></script>
+<script src="dash169.js"></script>
+<script src="dash169b.js"></script>
 <script>
 "use strict";
 RSIMC.loadFonts();
@@ -131,12 +133,18 @@ function drawThumb(cv, p, d, t) {
 function card(p) {
   const cur = state.frame.connected && state.frame.profile === p.id;
   const el = document.createElement("div"); el.className = "card" + (cur ? " cur" : "");
-  const cv = document.createElement("canvas"); cv.width = 1000; cv.height = 450; el.appendChild(cv);
+  const cdsh = p.family === "custom" ? customs[p.id.slice(7)] : null;
+  const asp = cdsh ? (cdsh.w ? [cdsh.w, cdsh.h] : null) : RSIM.ASPECT && RSIM.ASPECT[p.family];
+  const cv = document.createElement("canvas"); cv.width = asp ? asp[0] : 1000; cv.height = asp ? asp[1] : 450;
+  if (asp) cv.style.aspectRatio = asp[0] + "/" + asp[1];
+  el.appendChild(cv);
   thumbs.push([cv, p]);
   const isC = p.family === "custom", dsh = isC ? customs[p.id.slice(7)] : null;
   const info = document.createElement("div"); info.className = "info";
-  info.innerHTML = `<div class="name"><span>${p.name.replace(/^★ /, "")}</span><span class="tag ${isC ? "c" : ""}">${isC ? "perso" : p.family}</span></div>
-    <div class="sub">${isC ? (dsh.pages || []).length + " page(s)" + ((dsh.match || []).length ? " · voitures : " + dsh.match.join(", ") : "") : (p.match || []).length ? "voitures : " + p.match.slice(0, 4).join(", ") : "par défaut"}${cur ? " · <b style='color:var(--g)'>affiché</b>" : ""}</div>`;
+  const isBB = p.cat === "Button box";
+  const nBtn = isC ? (dsh.pages || []).reduce((n, pg) => n + pg.widgets.filter(w => w.type === "button" || w.type === "switch").length, 0) : 0;
+  info.innerHTML = `<div class="name"><span>${p.name.replace(/^[★🎛] /, "")}</span><span class="tag ${isC ? "c" : ""}">${p.aspect === "16:9" ? "16:9" : "20:9"}</span></div>
+    <div class="sub">${isBB ? nBtn + " boutons / interrupteurs" : isC ? (dsh.pages || []).length + " page(s)" : (p.match || []).length ? "voitures : " + p.match.slice(0, 4).join(", ") : p.cat || ""}${cur ? " · <b style='color:var(--g)'>affiché</b>" : ""}</div>`;
   const act = document.createElement("div"); act.className = "act";
   const btn = (txt, cls, fn) => { const b = document.createElement("button"); b.textContent = txt; if (cls) b.className = cls; b.onclick = fn; act.appendChild(b); };
   btn("Afficher sur le téléphone", "pri", async () => {
@@ -148,32 +156,36 @@ function card(p) {
     await post("api/assign", { game: f.game, car: f.car, profile: p.id }); await post("api/action", { action: "dash_auto" });
     toast("Attribué à " + f.car); refresh();
   });
-  if (isC) {
-    btn("Éditer", "", () => location.href = "editor.html?id=" + encodeURIComponent(dsh.id));
-    btn("Dupliquer", "", async () => { const c = JSON.parse(JSON.stringify(dsh)); c.id = dsh.id + "_copie"; c.name = dsh.name + " (copie)";
-      await post("api/dashboard", c); toast("Copie créée"); load(); });
-    btn("Supprimer", "dan", async () => { if (!confirm("Supprimer « " + dsh.name + " » ?")) return; await post("api/dashboard/delete", { id: dsh.id }); load(); });
-  }
+  if (isBB) btn("🎛 Assigner les touches", "", () => location.href = "buttonbox.html?id=" + encodeURIComponent(dsh.id));
+  if (isC && !isBB) btn("Supprimer", "dan", async () => { if (!confirm("Supprimer « " + dsh.name + " » ?")) return; await post("api/dashboard/delete", { id: dsh.id }); load(); });
   el.appendChild(info); info.appendChild(act); return el;
 }
 async function load() {
-  profiles = (await (await fetch("cars.json")).json()).profiles;
+  const cj = await (await fetch("cars.json")).json(); profiles = cj.profiles; CATS = cj.categories || [];
   const list = await (await fetch("api/dashboards")).json();
   customs = {};
   await Promise.all(list.map(async x => customs[x.id] = await (await fetch("api/dashboard?id=" + encodeURIComponent(x.id))).json()));
   render();
 }
+let CATS = [], curCat = localStorage.getItem("hubCat") || "Tous";
 function render() {
   thumbs = [];
-  const gc = $("gCustom"), gb = $("gBuilt"); gc.innerHTML = ""; gb.innerHTML = "";
-  const cs = profiles.filter(p => p.family === "custom");
-  if (!cs.length) gc.innerHTML = '<p style="color:var(--m)">Aucun dashboard perso pour l\'instant. Clique sur « Créer un dashboard ».</p>';
-  cs.forEach(p => gc.appendChild(card(p)));
-  profiles.filter(p => p.family !== "custom").forEach(p => gb.appendChild(card(p)));
+  const present = CATS.filter(c => profiles.some(p => (p.cat || "Génériques") === c));
+  profiles.forEach(p => { if (!present.includes(p.cat || "Génériques")) present.push(p.cat || "Génériques"); });
+  if (curCat !== "Tous" && !present.includes(curCat)) curCat = "Tous";
+  const bar = $("cats"); bar.innerHTML = "";
+  ["Tous", ...present].forEach(c => { const b = document.createElement("button"); b.textContent = c + (c === "Tous" ? "" : " (" + profiles.filter(p => (p.cat || "Génériques") === c).length + ")");
+    if (c === curCat) b.className = "on"; b.onclick = () => { curCat = c; localStorage.setItem("hubCat", c); render(); }; bar.appendChild(b); });
+  const auto = document.createElement("button"); auto.textContent = "↺ Dash automatique"; auto.style.marginLeft = "auto";
+  auto.onclick = async () => { await post("api/action", { action: "dash_auto" }); toast("Dashboard automatique selon la voiture"); }; bar.appendChild(auto);
+  const all = $("gAll"); all.innerHTML = "";
+  (curCat === "Tous" ? present : [curCat]).forEach(c => {
+    const h = document.createElement("h2"); h.textContent = c; all.appendChild(h);
+    const g = document.createElement("div"); g.className = "grid"; all.appendChild(g);
+    profiles.filter(p => (p.cat || "Génériques") === c).forEach(p => g.appendChild(card(p)));
+  });
   renderSeen();
 }
-$("bNew").onclick = () => location.href = "editor.html?new=1";
-$("bAuto").onclick = async () => { await post("api/action", { action: "dash_auto" }); toast("Dashboard automatique selon la voiture"); };
 
 /* ---------- voitures ---------- */
 function renderSeen() {
@@ -210,7 +222,7 @@ async function binds() {
     : '<p style="color:var(--m)">Aucun bouton configuré.</p>';
 }
 let lastA = 0;
-function anim(ts) { if (ts - lastA > 150) { lastA = ts; const t = ts / 1000; thumbs.forEach(([cv, p]) => drawThumb(cv, p, sample, t)); } requestAnimationFrame(anim); }
+function anim(ts) { if (ts - lastA > 400) { lastA = ts; const t = ts / 1000; thumbs.forEach(([cv, p]) => drawThumb(cv, p, sample, t)); } requestAnimationFrame(anim); }
 load().then(() => { refresh(); binds(); setInterval(refresh, 1500); requestAnimationFrame(anim); });
 </script>
 </body>
