@@ -89,7 +89,7 @@ class State:
     def all_profiles(self):
         prof = list(self.cars.get("profiles", []))
         for dsh in self.dashes.values():
-            prof.append({"id": "custom:" + dsh["id"], "name": ("🎛 " if dsh.get("category") == "Button box" else "★ ") + dsh.get("name", dsh["id"]),
+            prof.append({"id": "custom:" + dsh["id"], "name": ("🎛 " if dsh.get("category") == "Button box" else "▤ " if dsh.get("type") == "multi" else "★ ") + dsh.get("name", dsh["id"]),
                          "family": "custom", "cat": dsh.get("category", "Mes dashboards perso"),
                          "aspect": "16:9" if dsh.get("w") == 1600 else None, "games": [], "match": dsh.get("match", [])})
         return prof
@@ -136,12 +136,17 @@ class State:
                 self.action(b.get("action"))
 
     # ---- choix du dashboard
-    def resolve(self, game, car, cls):
+    def is_multi(self, pid):
+        return bool(pid and pid.startswith("custom:") and (self.dashes.get(pid[7:]) or {}).get("type") == "multi")
+
+    def resolve(self, game, car, cls, no_multi=False):
         key = "%s|%s" % (game, car)
-        if key in self.assign:
+        if key in self.assign and not (no_multi and self.is_multi(self.assign[key])):
             return self.assign[key], "manuel"
         hay = (car + " " + cls).lower()
         for p in self.all_profiles():
+            if no_multi and self.is_multi(p["id"]):
+                continue
             games = p.get("games") or []
             if games and not any(g.lower() in game.lower() for g in games):
                 continue
@@ -182,6 +187,7 @@ class State:
                 self.frame = {"connected": False}
             return
         prof, how = self.resolve(d["game"], d["car"], d["carClass"])
+        d["autoProfile"] = self.resolve(d["game"], d["car"], d["carClass"], no_multi=True)[0]
         if self.ui["override"]:
             prof, how = self.ui["override"], "bouton"
         if prof != self.ui["lastProfile"]:

@@ -1,0 +1,26 @@
+{
+ "id": "multi_endu",
+ "name": "Endurance : dash + essence + pneus + box",
+ "pages": [
+  {
+   "ref": "auto",
+   "name": "Dash"
+  },
+  {
+   "ref": "d169_fuel",
+   "name": "Essence"
+  },
+  {
+   "ref": "d169_tyres",
+   "name": "Pneus"
+  },
+  {
+   "ref": "custom:bb_proto",
+   "name": "Button box"
+  }
+ ],
+ "type": "multi",
+ "category": "Multi-pages",
+ "w": 1600,
+ "h": 900
+}

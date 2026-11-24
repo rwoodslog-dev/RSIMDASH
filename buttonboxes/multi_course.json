@@ -1,0 +1,22 @@
+{
+ "id": "multi_course",
+ "name": "Course : dash + pneus + button box",
+ "pages": [
+  {
+   "ref": "auto",
+   "name": "Dash"
+  },
+  {
+   "ref": "d169_tyres",
+   "name": "Pneus"
+  },
+  {
+   "ref": "custom:bb_gt3",
+   "name": "Button box"
+  }
+ ],
+ "type": "multi",
+ "category": "Multi-pages",
+ "w": 1600,
+ "h": 900
+}

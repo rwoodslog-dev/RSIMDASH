@@ -101,6 +101,7 @@
 <script src="widgets.js"></script>
 <script src="dash169.js"></script>
 <script src="dash169b.js"></script>
+<script src="multi.js"></script>
 <script>
 "use strict";
 RSIMC.loadFonts();
@@ -123,7 +124,13 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
 /* ---------- dashboards ---------- */
 function drawThumb(cv, p, d, t) {
   const c = cv.getContext("2d");
-  if (p.family === "custom") { const dsh = customs[p.id.slice(7)]; if (dsh) RSIMC.draw(c, JSON.parse(JSON.stringify(d)), dsh, 0, t); }
+  if (p.family === "custom") { const dsh = customs[p.id.slice(7)]; if (!dsh) return;
+    if (RSIMM.isMulti(dsh)) {   // apercu : les pages defilent toutes les 2 s
+      const dd = Object.assign({}, d, { profile: p.id, page: Math.floor(t / 2), autoProfile: "d169_gt3oem" });
+      const v = RSIMM.resolve(dd, id => customs[id], profiles); if (v.kind === "loading") return;
+      const [vw, vh] = RSIMM.size(v); c.save(); c.clearRect(0, 0, cv.width, cv.height); c.scale(cv.width / vw, cv.height / vh);
+      RSIMM.draw(c, v, JSON.parse(JSON.stringify(dd)), t); c.restore(); RSIMM.overlay(c, v, cv.width, cv.height, t, -9);
+    } else RSIMC.draw(c, JSON.parse(JSON.stringify(d)), dsh, 0, t); }
   else if (RSIM.FAMILIES[p.family]) {
     const dd = Object.assign({}, d);
     if (p.family === "analog") { dd.maxRpm = (p.theme.tachMax || 8000) * 0.85; dd.rpm = dd.maxRpm * 0.8; dd.speed = 121; }
@@ -141,10 +148,11 @@ function card(p) {
   thumbs.push([cv, p]);
   const isC = p.family === "custom", dsh = isC ? customs[p.id.slice(7)] : null;
   const info = document.createElement("div"); info.className = "info";
-  const isBB = p.cat === "Button box";
-  const nBtn = isC ? (dsh.pages || []).reduce((n, pg) => n + pg.widgets.filter(w => w.type === "button" || w.type === "switch").length, 0) : 0;
-  info.innerHTML = `<div class="name"><span>${p.name.replace(/^[★🎛] /, "")}</span><span class="tag ${isC ? "c" : ""}">${p.aspect === "16:9" ? "16:9" : "20:9"}</span></div>
-    <div class="sub">${isBB ? nBtn + " boutons / interrupteurs" : isC ? (dsh.pages || []).length + " page(s)" : (p.match || []).length ? "voitures : " + p.match.slice(0, 4).join(", ") : p.cat || ""}${cur ? " · <b style='color:var(--g)'>affiché</b>" : ""}</div>`;
+  const isBB = p.cat === "Button box", isM = isC && RSIMM.isMulti(dsh);
+  const pname = r => r === "auto" ? "Dash de la voiture" : ((profiles.find(x => x.id === r) || {}).name || r).replace(/^[★🎛▤] /, "");
+  const nBtn = isC ? (dsh.pages || []).reduce((n, pg) => n + (pg.widgets || []).filter(w => w.type === "button" || w.type === "switch").length, 0) : 0;
+  info.innerHTML = `<div class="name"><span>${p.name.replace(/^[★🎛▤] /, "")}</span><span class="tag ${isC ? "c" : ""}">${p.aspect === "16:9" ? "16:9" : "20:9"}</span></div>
+    <div class="sub">${isM ? dsh.pages.map((pg, i) => (i + 1) + ". " + pname(pg.ref)).join(" · ") : isBB ? nBtn + " boutons / interrupteurs" : isC ? (dsh.pages || []).length + " page(s)" : (p.match || []).length ? "voitures : " + p.match.slice(0, 4).join(", ") : p.cat || ""}${cur ? " · <b style='color:var(--g)'>affiché</b>" : ""}</div>`;
   const act = document.createElement("div"); act.className = "act";
   const btn = (txt, cls, fn) => { const b = document.createElement("button"); b.textContent = txt; if (cls) b.className = cls; b.onclick = fn; act.appendChild(b); };
   btn("Afficher sur le téléphone", "pri", async () => {
@@ -157,6 +165,7 @@ function card(p) {
     toast("Attribué à " + f.car); refresh();
   });
   if (isBB) btn("🎛 Assigner les touches", "", () => location.href = "buttonbox.html?id=" + encodeURIComponent(dsh.id));
+  if (isM) btn("✎ Modifier les pages", "", () => location.href = "multipage.html?id=" + encodeURIComponent(dsh.id));
   if (isC && !isBB) btn("Supprimer", "dan", async () => { if (!confirm("Supprimer « " + dsh.name + " » ?")) return; await post("api/dashboard/delete", { id: dsh.id }); load(); });
   el.appendChild(info); info.appendChild(act); return el;
 }
@@ -176,7 +185,8 @@ function render() {
   const bar = $("cats"); bar.innerHTML = "";
   ["Tous", ...present].forEach(c => { const b = document.createElement("button"); b.textContent = c + (c === "Tous" ? "" : " (" + profiles.filter(p => (p.cat || "Génériques") === c).length + ")");
     if (c === curCat) b.className = "on"; b.onclick = () => { curCat = c; localStorage.setItem("hubCat", c); render(); }; bar.appendChild(b); });
-  const auto = document.createElement("button"); auto.textContent = "↺ Dash automatique"; auto.style.marginLeft = "auto";
+  const nm = document.createElement("button"); nm.textContent = "＋ Écran multi-pages"; nm.style.marginLeft = "auto"; nm.onclick = () => location.href = "multipage.html"; bar.appendChild(nm);
+  const auto = document.createElement("button"); auto.textContent = "↺ Dash automatique";
   auto.onclick = async () => { await post("api/action", { action: "dash_auto" }); toast("Dashboard automatique selon la voiture"); }; bar.appendChild(auto);
   const all = $("gAll"); all.innerHTML = "";
   (curCat === "Tous" ? present : [curCat]).forEach(c => {

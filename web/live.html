@@ -41,6 +41,7 @@
 <script src="widgets.js"></script>
 <script src="dash169.js"></script>
 <script src="dash169b.js"></script>
+<script src="multi.js"></script>
 <script>
 "use strict";
 const cv = document.getElementById("c"), ctx = cv.getContext("2d");
@@ -133,15 +134,14 @@ function loop(ts) {
     RSIM.drawWaiting(ctx, t, location.host);
   } else {
     const d = smooth(frame);
-    if (d.profile && d.profile.startsWith("custom:")) {
-      const dsh = getCustom(d.profile.slice(7));
-      if (dsh && dsh.pages) { setLogical(dsh.w || RSIM.W, dsh.h || RSIM.H); pressMark(dsh); RSIMC.draw(ctx, d, dsh, d.page || 0, t); requestAnimationFrame(loop); return; }
-    }
-    const p = cars.profiles.find(x => x.id === d.profile) || cars.profiles.find(x => x.id === "universal");
-    const fam = p ? RSIM.FAMILIES[p.family] : null;
-    const asp = p && RSIM.ASPECT && RSIM.ASPECT[p.family];
-    setLogical(asp ? asp[0] : RSIM.W, asp ? asp[1] : RSIM.H);
-    if (fam) fam(ctx, d, p.theme, t); else RSIM.drawWaiting(ctx, t, "profil inconnu : " + d.profile);
+    const v = curView = RSIMM.resolve(d, getCustom, cars.profiles);
+    const sig = d.profile + "|" + (v.multi ? v.multi.index : "");
+    if (sig !== pageSig) { if (pageSig && v.multi) pageChangedAt = t; pageSig = sig; }
+    const [vw, vh] = v.kind === "loading" ? [RSIM.W, RSIM.H] : RSIMM.size(v);
+    setLogical(vw, vh);
+    if (v.kind === "custom") pressMark(v.dsh, v.page);
+    if (v.kind !== "loading" && !RSIMM.draw(ctx, v, d, t)) RSIM.drawWaiting(ctx, t, "profil inconnu : " + d.profile);
+    RSIMM.overlay(ctx, v, vw, vh, t, pageChangedAt);
   }
   requestAnimationFrame(loop);
 }
@@ -177,24 +177,36 @@ function toCanvas(e) {
   const sw = (comp === 90 || comp === 270) ? r.height : r.width, sh = (comp === 90 || comp === 270) ? r.width : r.height;
   return [(rx / sw + 0.5) * LW, (ry / sh + 0.5) * LH];
 }
-function pressMark(dsh) { if (lastPress && lastPress.dash === dsh) { const w = RSIMC.hit(dsh, frame.page || 0, lastPress.x, lastPress.y); if (w) w._pressed = lastPress.t; } }
+let curView = null, pageSig = "", pageChangedAt = -9;
+function pressMark(dsh, page) { if (lastPress && lastPress.dash === dsh) { const w = RSIMC.hit(dsh, page, lastPress.x, lastPress.y); if (w) w._pressed = lastPress.t; } }
 const sendAct = a => fetch("api/action", { method: "POST", body: JSON.stringify({ action: a }) });
 const held = {};   // pointerId -> widget (boutons "maintenu")
+let swipe = null;
 cv.addEventListener("pointerdown", e => {
   longDone = false; pressT = setTimeout(() => { longDone = true; openMenu(); }, 700);
-  if (frame.connected && frame.profile && frame.profile.startsWith("custom:")) {
-    const dsh = customCache[frame.profile.slice(7)], [x, y] = toCanvas(e);
-    const w = dsh ? RSIMC.hit(dsh, frame.page || 0, x, y) : null;
+  const [x, y] = toCanvas(e); swipe = { id: e.pointerId, x, y, t: performance.now() };
+  const v = curView;
+  if (frame.connected && v && v.kind === "custom") {
+    const w = RSIMC.hit(v.dsh, v.page, x, y);
     if (w) {
-      clearTimeout(pressT); lastPress = { dash: dsh, x, y, t: performance.now() / 1000 };
+      clearTimeout(pressT); swipe = null; lastPress = { dash: v.dsh, x, y, t: performance.now() / 1000 };
       if (w.vibrate !== false && navigator.vibrate) navigator.vibrate(25);
       w._down = true; held[e.pointerId] = w;
       RSIMC.pressActions(w, "down", frame).forEach(sendAct);
     }
   }
 });
+cv.addEventListener("pointermove", e => {   // glisser = changer de page (ecrans multi-pages)
+  if (!swipe || swipe.id !== e.pointerId) return;
+  const [x, y] = toCanvas(e), dx = x - swipe.x, dy = y - swipe.y;
+  if (Math.abs(dx) > 15 || Math.abs(dy) > 15) clearTimeout(pressT);
+  if (Math.abs(dx) > LW * 0.12 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    swipe = null;
+    if (curView && curView.multi) { if (navigator.vibrate) navigator.vibrate(15); sendAct(dx < 0 ? "page_next" : "page_prev"); }
+  }
+});
 function release(e) {
-  clearTimeout(pressT);
+  clearTimeout(pressT); if (swipe && swipe.id === e.pointerId) swipe = null;
   const w = held[e.pointerId]; if (!w) return;
   delete held[e.pointerId]; w._down = false;
   RSIMC.pressActions(w, "up", frame).forEach(sendAct);

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e12">
+<link rel="icon" href="icon-192.png">
+<title>RSIM · Écran multi-pages</title>
+<style>
+  :root { --bg:#0b0e12; --p:#11161d; --p2:#161c24; --b:#232c37; --t:#e6edf3; --m:#8fa3b5; --a:#3fd0ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--t); font:14px/1.4 "Segoe UI", Roboto, sans-serif; }
+  header { display:flex; align-items:center; gap:10px; padding:12px 18px; background:var(--p); border-bottom:1px solid var(--b); flex-wrap:wrap; }
+  header a { color:var(--a); text-decoration:none; font-weight:600; } header h1 { margin:0; font-size:18px; }
+  input, select, button { font:inherit; color:var(--t); background:var(--p2); border:1px solid var(--b); border-radius:8px; padding:7px 9px; }
+  button { cursor:pointer; } .pri { background:#1d6fe0; border-color:#1d6fe0; } .dan { color:#ff8a80; }
+  main { display:grid; grid-template-columns: minmax(0, 1fr) 520px; gap:16px; padding:16px 18px; }
+  @media (max-width:1100px) { main { grid-template-columns: 1fr; } }
+  #cv { width:100%; background:#000; border-radius:10px; aspect-ratio:16/9; display:block; }
+  .list { display:grid; grid-template-columns:minmax(0,1fr); gap:8px; align-content:start; min-width:0; }
+  .pg { background:var(--p); border:1px solid var(--b); border-radius:10px; padding:8px; display:grid; grid-template-columns: 34px 150px minmax(0,1fr); gap:8px; align-items:center; cursor:pointer; }
+  .pg.on { border-color:var(--a); box-shadow:0 0 0 1px var(--a); }
+  .pg .n { font-size:22px; font-weight:700; text-align:center; color:var(--a); }
+  .pg canvas { width:150px; aspect-ratio:16/9; background:#000; border-radius:6px; }
+  .pg .f { display:grid; grid-template-columns:minmax(0,1fr); gap:5px; min-width:0; } .pg .f div { display:flex; gap:4px; } .pg .f div input { flex:1; min-width:0; }
+  .pg select { width:100%; min-width:0; } .sm { padding:5px 9px; }
+  .hint { color:var(--m); font-size:13px; } b.k { color:#ffd58a; }
+  .toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#1d6fe0; padding:8px 16px; border-radius:8px; display:none; }
+</style>
+</head>
+<body>
+<header>
+  <a href="hub.html">← Dashboards</a><h1>Écran multi-pages</h1>
+  <select id="sel"></select>
+  <input id="name" placeholder="Nom de l'écran" style="min-width:260px">
+  <button class="pri" id="bSave">Enregistrer</button>
+  <button id="bShow">Afficher sur le téléphone</button>
+  <button id="bCar">Mettre sur la voiture en cours</button>
+  <button class="dan" id="bDel">Supprimer</button>
+</header>
+<main>
+  <div>
+    <canvas id="cv" width="1600" height="900"></canvas>
+    <p class="hint">Chaque page affiche un dashboard au choix : dash de la voiture (choisi automatiquement), n'importe quel dash, ou une button box.<br>
+      Sur le téléphone : <b class="k">glisse vers la gauche / la droite</b> pour changer de page. Au volant : assigne un bouton à
+      <b class="k">Page suivante</b> (onglet « Boutons volant »). Des petits points en bas indiquent la page affichée.</p>
+  </div>
+  <div class="list">
+    <div id="pages" class="list"></div>
+    <button id="bAdd">＋ Ajouter une page</button>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script src="api.js"></script>
+<script src="dash.js"></script>
+<script src="custom.js"></script>
+<script src="widgets.js"></script>
+<script src="dash169.js"></script>
+<script src="dash169b.js"></script>
+<script src="multi.js"></script>
+<script>
+"use strict";
+if (RSIMAPI.needsSetup) location.href = "settings.html?first=1";
+RSIMC.loadFonts();
+const $ = id => document.getElementById(id);
+const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 2200); };
+const post = (u, b) => fetch(u, { method: "POST", body: JSON.stringify(b || {}) }).then(r => r.json());
+const sample = { connected: true, gear: 4, rpm: 7000, maxRpm: 8000, shiftRpm: 0, speed: 187, throttle: 1, brake: 0, clutch: 0, fuel: 42.6, fuelCap: 100,
+  fuelPerLap: 3.1, fuelLaps: 13.7, tc: 3, abs: 2, map: 1, bb: 52.4, limiter: false, lights: true, water: 91, oil: 104, turbo: 1.42,
+  tyreT: [62, 84, 92, 107], tyreP: [1.72, 1.74, 1.69, 1.70], brakeT: [450, 460, 380, 390], tyreWear: [0.98, 0.98, 0.99, 0.99],
+  lap: 7, pos: 4, cur: 41.233, last: 89.412, best: 88.903, delta: -0.214, sessionLeft: 2400, tcActive: false, absActive: false };
+let profiles = [], CATS = [], customs = {}, scr = null, cur = 0, minis = [];
+
+async function load(selectId) {
+  const cj = await (await fetch("cars.json")).json(); profiles = cj.profiles; CATS = cj.categories || [];
+  const list = await (await fetch("api/dashboards")).json(); customs = {};
+  await Promise.all(list.map(async x => customs[x.id] = await (await fetch("api/dashboard?id=" + encodeURIComponent(x.id))).json()));
+  const multis = Object.values(customs).filter(RSIMM.isMulti);
+  $("sel").innerHTML = '<option value="">＋ Nouvel écran</option>' + multis.map(m => `<option value="${m.id}">${m.name}</option>`).join("");
+  const want = selectId !== undefined ? selectId : new URLSearchParams(location.search).get("id");
+  open(want && customs[want] ? customs[want] : null);
+}
+function open(m) {
+  scr = m ? JSON.parse(JSON.stringify(m)) : { id: "multi_" + Date.now().toString(36), name: "Mon écran", type: "multi", category: "Multi-pages", w: 1600, h: 900,
+    pages: [{ ref: "auto", name: "Dash" }, { ref: "d169_tyres", name: "Pneus" }, { ref: "custom:bb_gt3", name: "Button box" }] };
+  $("sel").value = m ? m.id : ""; $("name").value = scr.name; cur = 0; renderPages();
+}
+function options() {
+  const groups = {};
+  profiles.forEach(p => { if (p.id === "custom:" + scr.id || (p.family === "custom" && RSIMM.isMulti(customs[p.id.slice(7)]))) return;
+    (groups[p.cat || "Génériques"] = groups[p.cat || "Génériques"] || []).push(p); });
+  const order = [...CATS.filter(c => groups[c]), ...Object.keys(groups).filter(c => !CATS.includes(c))];
+  return '<option value="auto">🚗 Dash de la voiture (automatique)</option>' + order.map(c => `<optgroup label="${c}">` +
+    groups[c].map(p => `<option value="${p.id}">${p.name.replace(/^[★🎛▤] /, "")}</option>`).join("") + "</optgroup>").join("");
+}
+function renderPages() {
+  const box = $("pages"); box.innerHTML = ""; minis = []; const opts = options();
+  scr.pages.forEach((pg, i) => {
+    const el = document.createElement("div"); el.className = "pg" + (i === cur ? " on" : "");
+    el.innerHTML = `<div class="n">${i + 1}</div><canvas width="1600" height="900"></canvas>
+      <div class="f"><select>${opts}</select><div><input placeholder="Nom de la page" value="${(pg.name || "").replace(/"/g, "&quot;")}">
+      <button class="sm" title="Monter">↑</button><button class="sm" title="Descendre">↓</button><button class="sm dan" title="Retirer">✕</button></div></div>`;
+    const [, cvs, f] = el.children, sel = f.querySelector("select"), [inp, up, dn, del] = f.querySelectorAll("input,button");
+    sel.value = pg.ref || "auto";
+    sel.onchange = () => { pg.ref = sel.value; if (!pg.name || pg.autoName) { pg.name = sel.selectedOptions[0].textContent.replace(/^🚗 /, "").slice(0, 24); pg.autoName = true; inp.value = pg.name; } };
+    inp.oninput = () => { pg.name = inp.value; delete pg.autoName; };
+    up.onclick = e => { e.stopPropagation(); if (i > 0) { scr.pages.splice(i - 1, 0, scr.pages.splice(i, 1)[0]); cur = i - 1; renderPages(); } };
+    dn.onclick = e => { e.stopPropagation(); if (i < scr.pages.length - 1) { scr.pages.splice(i + 1, 0, scr.pages.splice(i, 1)[0]); cur = i + 1; renderPages(); } };
+    del.onclick = e => { e.stopPropagation(); if (scr.pages.length < 2) return toast("Il faut au moins une page"); scr.pages.splice(i, 1); cur = Math.min(cur, scr.pages.length - 1); renderPages(); };
+    el.onclick = e => { if (e.target.closest("select,input,button")) return; cur = i; box.querySelectorAll(".pg").forEach((x, k) => x.classList.toggle("on", k === i)); };
+    minis.push(cvs); box.appendChild(el);
+  });
+}
+function drawPage(cv, i, t, dots) {
+  const c = cv.getContext("2d"), tmp = Object.assign({}, customs, { [scr.id]: scr });
+  const d = Object.assign({}, sample, { profile: "custom:" + scr.id, page: i, autoProfile: "d169_gt3oem" });
+  const v = RSIMM.resolve(d, id => tmp[id], profiles); c.clearRect(0, 0, cv.width, cv.height); if (v.kind === "loading") return;
+  const [vw, vh] = RSIMM.size(v); c.save(); c.scale(cv.width / vw, cv.height / vh); RSIMM.draw(c, v, JSON.parse(JSON.stringify(d)), t); c.restore();
+  if (dots) RSIMM.overlay(c, v, cv.width, cv.height, t, -9);
+}
+let last = 0;
+function anim(ts) {
+  if (scr && ts - last > 250) { last = ts; const t = ts / 1000; drawPage($("cv"), cur, t, true); minis.forEach((m, i) => drawPage(m, i, t, false)); }
+  requestAnimationFrame(anim);
+}
+async function save() {
+  scr.name = $("name").value.trim() || "Mon écran";
+  scr.pages = scr.pages.map(p => ({ ref: p.ref || "auto", name: p.name || "" }));
+  await post("api/dashboard", scr); toast("Enregistré"); await load(scr.id);
+}
+$("sel").onchange = () => open(customs[$("sel").value] || null);
+$("bAdd").onclick = () => { scr.pages.push({ ref: "auto", name: "" }); cur = scr.pages.length - 1; renderPages(); };
+$("bSave").onclick = save;
+$("bShow").onclick = async () => { await save(); await post("api/action", { action: "dash:custom:" + scr.id }); toast("Affiché sur le téléphone"); };
+$("bCar").onclick = async () => {
+  const st = await (await fetch("api/state")).json(), f = st.frame || {};
+  if (!f.connected) return toast("Aucun jeu en cours");
+  await save(); await post("api/assign", { game: f.game, car: f.car, profile: "custom:" + scr.id }); await post("api/action", { action: "dash_auto" });
+  toast("Attribué à " + f.car);
+};
+$("bDel").onclick = async () => {
+  if (!customs[scr.id]) return open(null);
+  if (!confirm("Supprimer « " + scr.name + " » ? (un écran fourni revient à sa version d'origine)")) return;
+  await post("api/dashboard/delete", { id: scr.id }); toast("Supprimé"); load("");
+};
+load().then(() => requestAnimationFrame(anim));
+</script>
+</body>
+</html>
