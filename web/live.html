@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>RSIM Dash</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; touch-action: none; -webkit-user-select: none; user-select: none; }
+  canvas { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); display: block; }
+  #tap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #9ab; font: 600 18px sans-serif; background: rgba(0,0,0,.55); }
+  #menu { position: fixed; top: 8px; right: 8px; display: none; background: #111c; border: 1px solid #333; border-radius: 12px; padding: 12px; color: #eee; font: 14px sans-serif; max-width: 70vw; }
+  #menu select, #menu button { font-size: 15px; margin-top: 8px; width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #444; background: #1b1b1b; color: #fff; }
+  #menu small { color: #8a9; display: block; margin-top: 4px; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="tap">Touchez pour passer en plein écran</div>
+<div id="menu">
+  <div id="carname">—</div><small id="how"></small>
+  <select id="prof"></select>
+  <button id="save">Utiliser ce dash pour cette voiture</button>
+  <small>Orientation verrouillée (téléphone sur le volant)</small>
+  <select id="orient">
+    <option value="landscape-primary">Paysage (boutons à droite)</option>
+    <option value="landscape-secondary">Paysage inversé (boutons à gauche)</option>
+    <option value="off">Libre (rotation auto)</option>
+  </select>
+  <small id="lockinfo"></small>
+  <button id="edit">✎ Modifier ce dashboard</button>
+  <button id="home">⌂ Accueil RSIM</button>
+  <button id="close">Fermer</button>
+</div>
+<script src="api.js"></script>
+<script src="dash.js"></script>
+<script src="custom.js"></script>
+<script src="widgets.js"></script>
+<script>
+"use strict";
+const cv = document.getElementById("c"), ctx = cv.getContext("2d");
+let cars = { profiles: [] }, frame = { connected: false }, view = null, lastMsg = 0;
+RSIMC.loadFonts();
+/* dashboards perso : charges a la demande, recharges quand on enregistre dans l'editeur */
+const customCache = {}; let customRev = -1;
+function getCustom(id) {
+  if (frame.dashRev !== customRev) { for (const k in customCache) delete customCache[k]; customRev = frame.dashRev;
+    fetch("cars.json").then(r => r.json()).then(fillProfiles); }
+  if (!(id in customCache)) { customCache[id] = null;
+    fetch("api/dashboard?id=" + encodeURIComponent(id)).then(r => r.json()).then(j => customCache[id] = j).catch(() => {}); }
+  return customCache[id];
+}
+
+/* ---- verrou d'orientation : le dash reste fixe par rapport au telephone ----
+   1) verrou natif (plein ecran Android) ; 2) sinon compensation : on tourne le dessin
+   a l'inverse de la rotation de l'ecran. */
+let orientPref = localStorage.getItem("orient") || "landscape-primary", nativeLock = false, comp = 0;
+const ANG = { "portrait-primary": 0, "landscape-primary": 90, "portrait-secondary": 180, "landscape-secondary": 270 };
+async function lockOrient() {
+  nativeLock = false;
+  const P = window.Capacitor && window.Capacitor.Plugins;   // appli Android (APK)
+  if (P && P.ScreenOrientation && orientPref !== "off") {
+    try { await P.ScreenOrientation.lock({ orientation: orientPref }); nativeLock = true; updateComp(); return; } catch (e) {}
+  }
+  try {
+    if (orientPref === "off") screen.orientation.unlock();
+    else { await screen.orientation.lock(orientPref); nativeLock = true; }
+  } catch (e) {}
+  updateComp();
+}
+function updateComp() {
+  comp = 0;
+  if (orientPref !== "off" && !nativeLock && screen.orientation) {
+    comp = (((ANG[screen.orientation.type] ?? 90) - ANG[orientPref]) % 360 + 360) % 360;
+  }
+  cv.style.transform = `translate(-50%, -50%) rotate(${comp}deg)`;
+  const li = document.getElementById("lockinfo");
+  if (li) li.textContent = orientPref === "off" ? "rotation libre" : nativeLock ? "verrou natif actif ✔" : "verrou par compensation (bloque aussi la rotation auto Android)";
+  resize();
+}
+if (screen.orientation) screen.orientation.addEventListener("change", updateComp);
+
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  let sw = innerWidth, sh = innerHeight;
+  if (comp === 90 || comp === 270) [sw, sh] = [sh, sw];
+  const s = Math.min(sw / RSIM.W, sh / RSIM.H);
+  cv.style.width = RSIM.W * s + "px"; cv.style.height = RSIM.H * s + "px";
+  cv.width = Math.round(RSIM.W * s * dpr); cv.height = Math.round(RSIM.H * s * dpr);
+  ctx.setTransform(cv.width / RSIM.W, 0, 0, cv.height / RSIM.H, 0, 0);
+}
+addEventListener("resize", resize); resize();
+
+function fillProfiles(j) {
+  cars = j;
+  const sel = document.getElementById("prof"); sel.innerHTML = "";
+  j.profiles.forEach(p => { const o = document.createElement("option"); o.value = p.id; o.textContent = p.name; sel.appendChild(o); });
+}
+fetch("cars.json").then(r => r.json()).then(fillProfiles);
+
+if (RSIMAPI.needsSetup) location.href = "settings.html?from=live";
+function connect() {
+  const es = new EventSource("api/stream");
+  es.onmessage = e => { frame = JSON.parse(e.data); lastMsg = performance.now(); };
+  es.onerror = () => { es.close(); frame = { connected: false }; setTimeout(connect, 1500); };
+}
+connect();
+lockOrient();
+
+/* lissage du regime et de la vitesse pour une aiguille fluide */
+function smooth(target) {
+  if (!view || view.profile !== target.profile) { view = JSON.parse(JSON.stringify(target)); return view; }
+  const k = 0.45;
+  Object.assign(view, target, {
+    rpm: view.rpm + (target.rpm - view.rpm) * k,
+    speed: view.speed + (target.speed - view.speed) * k,
+  });
+  return view;
+}
+
+function loop(ts) {
+  const t = ts / 1000;
+  ctx.clearRect(0, 0, RSIM.W, RSIM.H);
+  if (!frame.connected || performance.now() - lastMsg > 3000) {
+    RSIM.drawWaiting(ctx, t, location.host);
+  } else {
+    const d = smooth(frame);
+    if (d.profile && d.profile.startsWith("custom:")) {
+      const dsh = getCustom(d.profile.slice(7));
+      if (dsh && dsh.pages) { pressMark(dsh); RSIMC.draw(ctx, d, dsh, d.page || 0, t); requestAnimationFrame(loop); return; }
+    }
+    const p = cars.profiles.find(x => x.id === d.profile) || cars.profiles.find(x => x.id === "universal");
+    const fam = p ? RSIM.FAMILIES[p.family] : null;
+    if (fam) fam(ctx, d, p.theme, t); else RSIM.drawWaiting(ctx, t, "profil inconnu : " + d.profile);
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* plein ecran + paysage + ecran allume */
+let wake = null;
+async function keepAwake() {
+  const P = window.Capacitor && window.Capacitor.Plugins;
+  if (P && P.KeepAwake) { try { await P.KeepAwake.keepAwake(); if (P.StatusBar) P.StatusBar.hide(); return; } catch (e) {} }
+  try { if ("wakeLock" in navigator) { wake = await navigator.wakeLock.request("screen"); return; } } catch (e) {}
+  try { // repli : petite video muette en boucle (garde l'ecran allume sur la plupart des Android)
+    const v = document.createElement("video");
+    v.muted = true; v.playsInline = true; v.loop = true;
+    v.style.cssText = "position:fixed;width:1px;height:1px;opacity:0.01;left:0;top:0";
+    v.srcObject = cv.captureStream(1); document.body.appendChild(v); await v.play();
+  } catch (e) {}
+}
+document.getElementById("tap").addEventListener("click", async () => {
+  try { await document.documentElement.requestFullscreen({ navigationUI: "hide" }); } catch (e) {}
+  await lockOrient();
+  keepAwake();
+  document.getElementById("tap").style.display = "none";
+});
+document.addEventListener("visibilitychange", () => { if (!document.hidden && wake) keepAwake(); });
+
+/* appui court sur un bouton tactile = action ; appui long = menu */
+let pressT = null, longDone = false, lastPress = null;
+function toCanvas(e) {
+  const r = cv.getBoundingClientRect();
+  let nx = (e.clientX - (r.left + r.width / 2)), ny = (e.clientY - (r.top + r.height / 2));
+  const a = -comp * Math.PI / 180, rx = nx * Math.cos(a) - ny * Math.sin(a), ry = nx * Math.sin(a) + ny * Math.cos(a);
+  const sw = (comp === 90 || comp === 270) ? r.height : r.width, sh = (comp === 90 || comp === 270) ? r.width : r.height;
+  return [(rx / sw + 0.5) * RSIM.W, (ry / sh + 0.5) * RSIM.H];
+}
+function pressMark(dsh) { if (lastPress && lastPress.dash === dsh) { const w = RSIMC.hit(dsh, frame.page || 0, lastPress.x, lastPress.y); if (w) w._pressed = lastPress.t; } }
+const sendAct = a => fetch("api/action", { method: "POST", body: JSON.stringify({ action: a }) });
+const held = {};   // pointerId -> widget (boutons "maintenu")
+cv.addEventListener("pointerdown", e => {
+  longDone = false; pressT = setTimeout(() => { longDone = true; openMenu(); }, 700);
+  if (frame.connected && frame.profile && frame.profile.startsWith("custom:")) {
+    const dsh = customCache[frame.profile.slice(7)], [x, y] = toCanvas(e);
+    const w = dsh ? RSIMC.hit(dsh, frame.page || 0, x, y) : null;
+    if (w) {
+      clearTimeout(pressT); lastPress = { dash: dsh, x, y, t: performance.now() / 1000 };
+      if (w.vibrate !== false && navigator.vibrate) navigator.vibrate(25);
+      w._down = true; held[e.pointerId] = w;
+      RSIMC.pressActions(w, "down", frame).forEach(sendAct);
+    }
+  }
+});
+function release(e) {
+  clearTimeout(pressT);
+  const w = held[e.pointerId]; if (!w) return;
+  delete held[e.pointerId]; w._down = false;
+  RSIMC.pressActions(w, "up", frame).forEach(sendAct);
+}
+cv.addEventListener("pointerup", release);
+cv.addEventListener("pointercancel", release);
+cv.addEventListener("pointerleave", release);
+/* interrupteurs : retour a OFF quand le jeu est ferme (option "Remettre a OFF") */
+setInterval(() => { if (!frame.connected) for (const k in customCache) { const d = customCache[k];
+  (d && d.pages || []).forEach(p => p.widgets.forEach(w => { if (w.type === "switch" && w.autoReset !== false) w._on = false; })); } }, 2000);
+function openMenu() {
+  document.getElementById("carname").textContent = frame.connected ? "[" + frame.game + "] " + (frame.car || "?") : "Aucun jeu connecté";
+  document.getElementById("how").textContent = frame.connected ? "dash : " + frame.profile + " (" + frame.how + ")" : "";
+  document.getElementById("prof").value = frame.profile;
+  document.getElementById("orient").value = orientPref;
+  document.getElementById("menu").style.display = "block";
+}
+document.getElementById("orient").onchange = e => { orientPref = e.target.value; localStorage.setItem("orient", orientPref); lockOrient(); };
+document.getElementById("edit").onclick = () => {
+  const p = frame.profile || ""; location.href = p.startsWith("custom:") ? "editor.html?id=" + encodeURIComponent(p.slice(7)) : "editor.html?new=1";
+};
+document.getElementById("home").onclick = () => location.href = "index.html";
+document.getElementById("close").onclick = () => document.getElementById("menu").style.display = "none";
+document.getElementById("save").onclick = () => {
+  if (!frame.connected) return;
+  fetch("api/assign", { method: "POST", body: JSON.stringify({ game: frame.game, car: frame.car, profile: document.getElementById("prof").value }) })
+    .then(() => document.getElementById("menu").style.display = "none");
+};
+</script>
+</body>
+</html>

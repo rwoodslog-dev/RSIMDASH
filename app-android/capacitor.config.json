@@ -1,0 +1,13 @@
+{
+  "appId": "com.rsim33.rsim",
+  "appName": "RSIM",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true,
+    "backgroundColor": "#0b0e12"
+  }
+}

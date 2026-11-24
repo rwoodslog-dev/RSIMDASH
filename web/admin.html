@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>RSIM Dash — Admin</title>
+<link rel="icon" href="icon-192.png">
+<style>
+  body { margin: 0; background: #0b0e12; color: #e6edf3; font: 14px/1.4 "Segoe UI", Roboto, sans-serif; }
+  header { padding: 14px 22px; background: #11161d; border-bottom: 1px solid #222a33; display: flex; gap: 18px; align-items: center; }
+  header b { font-size: 18px; letter-spacing: .5px; }
+  #live { color: #8fa3b5; }
+  main { padding: 18px 22px; display: grid; gap: 22px; }
+  h2 { font-size: 15px; margin: 0 0 10px; color: #3fd0ff; text-transform: uppercase; letter-spacing: 1px; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { padding: 7px 8px; border-bottom: 1px solid #1d242c; text-align: left; }
+  th { color: #8fa3b5; font-weight: 600; }
+  select { background: #161c23; color: #fff; border: 1px solid #2b3540; border-radius: 6px; padding: 5px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+  .card { background: #11161d; border: 1px solid #1f2731; border-radius: 10px; padding: 8px; }
+  .card canvas { width: 100%; display: block; border-radius: 6px; }
+  .card div { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+  button { background: #1d6fe0; color: #fff; border: 0; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  .tag { font-size: 12px; color: #8fa3b5; }
+</style>
+</head>
+<body>
+<header><b>RSIM DASH</b><span id="live">…</span></header>
+<main>
+  <section>
+    <h2>Voitures détectées</h2>
+    <p class="tag">Chaque voiture roulée apparaît ici avec le nom exact envoyé par le jeu. Choisis son dash : c'est mémorisé (assignments.json).</p>
+    <table><thead><tr><th>Jeu</th><th>Nom envoyé par le jeu</th><th>Classe</th><th>Dash</th></tr></thead><tbody id="seen"></tbody></table>
+  </section>
+  <section>
+    <h2>Dashboards disponibles</h2>
+    <div class="grid" id="gal"></div>
+  </section>
+</main>
+<script src="api.js"></script>
+<script src="dash.js"></script>
+<script>
+"use strict";
+let cars, state;
+const sample = {
+  gear: 4, rpm: 7350, maxRpm: 8000, shiftRpm: 0, speed: 187, throttle: 1, brake: 0, clutch: 0, fuel: 42.6, fuelCap: 100,
+  fuelPerLap: 3.1, fuelLaps: 13.7, tc: 3, abs: 2, map: 1, bb: 52.4, limiter: false, lights: true, water: 91, oil: 104, turbo: 1.42,
+  tyreT: [84, 86, 79, 81], tyreP: [1.72, 1.74, 1.69, 1.70], brakeT: [450, 460, 380, 390], tyreWear: [0.98, 0.98, 0.99, 0.99],
+  lap: 7, pos: 4, cur: 41.233, last: 89.412, best: 88.903, delta: -0.214, sessionLeft: 2400,
+};
+function opts(sel) {
+  const s = document.createElement("select");
+  const none = document.createElement("option"); none.value = ""; none.textContent = "(auto)"; s.appendChild(none);
+  cars.profiles.forEach(p => { const o = document.createElement("option"); o.value = p.id; o.textContent = p.name; s.appendChild(o); });
+  s.value = sel || ""; return s;
+}
+async function refresh() {
+  state = await (await fetch("api/state")).json();
+  const f = state.frame;
+  document.getElementById("live").textContent = f.connected
+    ? `● ${f.game} — ${f.car} → ${f.profile} (${f.how})` : "○ aucun jeu détecté" + (state.demo ? " (démo)" : "");
+  const sig = JSON.stringify([state.seen.map(s => s.game + s.car), state.assign]);
+  if (sig === refresh.sig) return; refresh.sig = sig;
+  const tb = document.getElementById("seen"); tb.innerHTML = "";
+  state.seen.forEach(s => {
+    const tr = document.createElement("tr"), key = s.game + "|" + s.car;
+    tr.innerHTML = `<td>${s.game}</td><td><code>${s.car}</code></td><td>${s.cls || ""}</td><td></td>`;
+    const sel = opts(state.assign[key]);
+    sel.onchange = () => fetch("api/assign", { method: "POST", body: JSON.stringify({ game: s.game, car: s.car, profile: sel.value }) });
+    tr.lastChild.appendChild(sel); tb.appendChild(tr);
+  });
+}
+async function init() {
+  cars = await (await fetch("cars.json")).json();
+  const gal = document.getElementById("gal");
+  cars.profiles.forEach(p => {
+    const card = document.createElement("div"); card.className = "card";
+    const cv = document.createElement("canvas"); cv.width = RSIM.W; cv.height = RSIM.H;
+    const ctx = cv.getContext("2d");
+    const d = Object.assign({}, sample);
+    if (p.family === "analog") { d.maxRpm = (p.theme.tachMax || 8000) * 0.85; d.rpm = d.maxRpm * 0.8; d.speed = 121; }
+    RSIM.FAMILIES[p.family](ctx, d, p.theme, 0.3);
+    const row = document.createElement("div");
+    row.innerHTML = `<span>${p.name}<br><span class="tag">${p.id} · ${p.family}</span></span>`;
+    const b = document.createElement("button"); b.textContent = "Tester (démo)";
+    b.onclick = () => fetch("api/demo", { method: "POST", body: JSON.stringify({ profile: p.id, maxRpm: d.maxRpm }) });
+    row.appendChild(b);
+    card.appendChild(cv); card.appendChild(row); gal.appendChild(card);
+  });
+  refresh(); setInterval(refresh, 2000);
+}
+init();
+</script>
+</body>
+</html>

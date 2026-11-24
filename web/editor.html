@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>RSIM Dash — Éditeur</title>
+<link rel="icon" href="icon-192.png">
+<style>
+  :root { --bg:#0b0e12; --p:#11161d; --p2:#161c24; --b:#232c37; --t:#e6edf3; --m:#8fa3b5; --a:#3fd0ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--t); font:13px/1.35 "Segoe UI", Roboto, sans-serif; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+  header { display:flex; gap:8px; align-items:center; padding:8px 12px; background:var(--p); border-bottom:1px solid var(--b); flex-wrap:wrap; }
+  header b { font-size:16px; margin-right:8px; letter-spacing:.5px; }
+  button, select, input { font:inherit; color:var(--t); background:var(--p2); border:1px solid var(--b); border-radius:6px; padding:5px 8px; }
+  button { cursor:pointer; } button:hover { border-color:var(--a); }
+  button.pri { background:#1d6fe0; border-color:#1d6fe0; } button.dan { background:#5a1d1d; border-color:#7a2a2a; }
+  .wrap { flex:1; display:grid; grid-template-columns: 210px 1fr 320px; min-height:0; }
+  aside { background:var(--p); border-right:1px solid var(--b); overflow:auto; padding:10px; }
+  aside.r { border-right:0; border-left:1px solid var(--b); }
+  h3 { margin:12px 0 6px; font-size:11px; color:var(--a); text-transform:uppercase; letter-spacing:1px; }
+  .add button { width:100%; margin:2px 0; text-align:left; }
+  #stage { display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding:16px; overflow:auto; gap:10px; }
+  #cv { background:#000; box-shadow:0 0 0 1px #333, 0 10px 40px #0008; cursor:default; max-width:100%; }
+  .pages { display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+  .pages button.on { background:#1d6fe0; }
+  #layers div { padding:4px 6px; border-radius:5px; cursor:pointer; display:flex; justify-content:space-between; }
+  #layers div.on { background:#1d3b66; } #layers div:hover { background:#1a222c; }
+  .row { display:grid; grid-template-columns: 112px 1fr; gap:6px; align-items:center; margin:4px 0; }
+  .row label { color:var(--m); }
+  .row input, .row select { width:100%; }
+  .col { display:flex; gap:4px; } .col input[type=color] { width:34px; padding:0; height:28px; }
+  .rule { background:var(--p2); border:1px solid var(--b); border-radius:6px; padding:6px; margin:4px 0; display:grid; grid-template-columns:1fr 54px 60px; gap:4px; }
+  .rule .full { grid-column: 1 / -1; display:flex; gap:4px; align-items:center; }
+  .hint { color:var(--m); font-size:12px; }
+  #tabs { display:flex; gap:4px; } #tabs button.on { background:#1d6fe0; }
+  #binds table { width:100%; border-collapse:collapse; } #binds td, #binds th { padding:4px; border-bottom:1px solid var(--b); text-align:left; }
+  #cat { position:fixed; inset:0; background:#000a; display:none; z-index:20; align-items:center; justify-content:center; }
+  #cat .box { background:#f4f4f4; color:#111; width:min(1100px,96vw); height:min(640px,92vh); border-radius:10px; display:grid; grid-template-columns: 230px 1fr; overflow:hidden; box-shadow:0 20px 60px #000; }
+  #cat .cats { overflow:auto; border-right:1px solid #ddd; background:#ececec; }
+  #cat .cats div { padding:16px 14px; font-size:17px; cursor:pointer; display:flex; gap:12px; align-items:center; border-bottom:1px solid #e0e0e0; }
+  #cat .cats div.on { background:#c9c9c9; }
+  #cat .items { overflow:auto; padding:8px 14px; }
+  #cat .it { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid #ddd; cursor:pointer; }
+  #cat .it:hover { background:#e6eefc; }
+  #cat .it b { font-size:17px; font-weight:500; } #cat .it small { display:block; color:#666; }
+  #cat .it canvas { width:220px; height:99px; background:#e2e2e2; border-radius:4px; flex:none; }
+  #cat .foot { grid-column:1/-1; display:flex; justify-content:flex-end; padding:10px 16px; border-top:1px solid #ddd; }
+  #cat .foot button { background:none; border:0; color:#d32f2f; font-size:16px; font-weight:700; }
+  #cat .box { grid-template-rows: 1fr auto; }
+  .fab { display:none; } .fabonly { display:none; }
+  .section-keys { background:var(--p2); border:1px solid var(--b); border-radius:8px; padding:8px; margin-top:10px; }
+  @media (max-width: 1100px), (pointer: coarse) {
+    header { padding:6px 8px; gap:6px; } header .more { display:none; } header.open .more { display:inline-block; } .fabonly { display:inline-block; }
+    .wrap { grid-template-columns: 1fr !important; }
+    #editView > aside:first-child { position:fixed; left:0; top:0; bottom:0; width:78vw; max-width:320px; z-index:15; transform:translateX(-105%); transition:.2s; }
+    #editView > aside:first-child.open { transform:none; }
+    aside.r { position:fixed; right:76px; top:0; bottom:0; width:80vw; max-width:380px; z-index:15; transform:translateX(calc(100% + 90px)); transition:.2s; }
+    aside.r.open { transform:none; }
+    #stage { padding:6px; } #cv { width:auto; max-width:calc(100% - 70px); max-height:calc(100vh - 96px); touch-action:none; align-self:flex-start; }
+    .fab { display:flex; position:fixed; right:12px; bottom:12px; flex-direction:column; gap:10px; z-index:18; }
+    .fab button { width:56px; height:56px; border-radius:50%; font-size:22px; border:0; box-shadow:0 4px 14px #0008; }
+    #cat .box { grid-template-columns: 130px 1fr; } #cat .cats div { font-size:14px; padding:12px 8px; } #cat .it canvas { width:140px; height:63px; }
+  }
+  .toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#1d6fe0; padding:8px 16px; border-radius:8px; display:none; }
+</style>
+</head>
+<body>
+<header>
+  <a href="index.html" style="color:#3fd0ff;text-decoration:none;font-weight:600">← RSIM</a><b>ÉDITEUR</b>
+  <select id="dashSel"></select>
+  <button id="bMore" class="fabonly" title="plus">⋯</button><button id="bNew" class="more">Nouveau</button><button id="bDup" class="more">Dupliquer</button><button id="bDel" class="dan more">Supprimer</button>
+  <button id="bSave" class="pri">Enregistrer (Ctrl+S)</button>
+  <span class="hint more">Nom</span><input id="dName" class="more" style="width:150px">
+  <span class="hint more" title="Mots cherchés dans le nom de voiture envoyé par le jeu">Voitures (mots-clés)</span><input id="dMatch" class="more" style="width:150px" placeholder="ex: bmw, m4">
+  <select id="dataSrc" class="more"><option value="demo">Données : démo animée</option><option value="live">Données : jeu en direct</option></select>
+  <button id="bAssign" class="more">Mettre sur la voiture en cours</button>
+  <span id="tabs" style="margin-left:auto"><button data-t="edit" class="on">Dashboard</button><button data-t="binds">Boutons volant</button></span>
+</header>
+<div class="wrap" id="editView">
+  <aside>
+    <button class="pri" id="bCatalog" style="width:100%;padding:10px;font-size:14px">+ Ajouter un élément</button>
+    <h3>Ajout rapide</h3>
+    <div class="add" id="addBtns"></div>
+    <h3>Calques (page)</h3>
+    <div id="layers"></div>
+    <div class="hint" style="margin-top:8px">Glisser = déplacer · coin = redimensionner · flèches = 1 px (Maj = 10) · Suppr · Ctrl+D dupliquer · Ctrl+C / Ctrl+V entre pages</div>
+  </aside>
+  <section id="stage">
+    <div class="pages" id="pages"></div>
+    <canvas id="cv" width="1000" height="450"></canvas>
+    <div class="hint">Toile 1000 × 450 (format téléphone 20:9). Grille <select id="grid"><option>1</option><option selected>5</option><option>10</option><option>20</option></select> · fond de page <input id="pageBg" style="width:90px"></div>
+  </section>
+  <aside class="r" id="props"><div class="hint">Sélectionne un élément pour le régler.</div></aside>
+</div>
+<div class="wrap" id="bindView" style="display:none; grid-template-columns:1fr">
+  <aside style="border:0" id="binds">
+    <h3>Boutons du volant (G29, Moza, button box…)</h3>
+    <div class="hint">« Capturer » puis appuie sur le bouton du volant. Actions : changer de page, de dashboard, ou envoyer une touche au jeu.</div>
+    <div id="devs" class="hint" style="margin:8px 0"></div>
+    <table><thead><tr><th>Périphérique</th><th>Bouton</th><th>Action</th><th>Touche (si action = touche)</th><th></th></tr></thead><tbody id="bindRows"></tbody></table>
+    <p><button id="bAddBind">+ Ajouter un bouton</button> <button id="bSaveBinds" class="pri">Enregistrer les boutons</button></p>
+    <h3>Actions disponibles</h3>
+    <div class="hint">page_next / page_prev : page suivante / précédente du dashboard · dash_next / dash_prev : dashboard suivant / précédent ·
+      dash_auto : revenir au dashboard automatique de la voiture · key : envoie une touche au jeu (ex. démarreur, phares, essuie-glace).</div>
+  </aside>
+</div>
+<div id="cat"><div class="box"><div class="cats" id="catList"></div><div class="items" id="catItems"></div>
+  <div class="foot"><button id="catClose">ANNULER</button></div></div></div>
+<div class="fab" id="fab">
+  <button id="fDel" style="background:#d93f2f" title="Supprimer">🗑</button>
+  <button id="fProps" style="background:#6aae0f" title="Personnaliser">🎨</button>
+  <button id="fDup" style="background:#999" title="Dupliquer">⧉</button>
+  <button id="fLayers" style="background:#999" title="Calques / pages">☰</button>
+  <button id="fAdd" style="background:#c7342a;width:68px;height:68px;font-size:30px" title="Ajouter un élément">+</button>
+</div>
+<div class="toast" id="toast"></div>
+<script src="api.js"></script>
+<script>if (RSIMAPI.needsSetup) location.href = "settings.html?first=1";</script>
+<script src="dash.js"></script>
+<script src="custom.js"></script>
+<script src="widgets.js"></script>
+<script>
+"use strict";
+RSIMC.loadFonts();
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+let dash = null, page = 0, sel = null, dirty = false, clip = null, live = { connected: false };
+const $ = id => document.getElementById(id);
+const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 1800); };
+const uid = () => Math.random().toString(36).slice(2, 8);
+const GRID = () => +$("grid").value;
+const snap = v => Math.round(v / GRID()) * GRID();
+
+/* ---------------- donnees de demonstration ---------------- */
+function demo(t) {
+  const cyc = (t % 6) / 6, g = 1 + Math.floor((t % 24) / 4), f = Math.min(1, cyc * 1.15), mx = 8000;
+  return { connected: true, game: "Démo", car: "Démo", gear: (t % 24) < 22 ? g : 2, rpm: mx * (0.55 + 0.45 * f), maxRpm: mx, speed: 60 + g * 30 * (0.6 + 0.4 * f),
+    throttle: (t % 24) < 20 ? 1 : 0, brake: (t % 24) < 20 ? 0 : 0.9, clutch: 0, fuel: 42.6 - (t % 60) * 0.05, fuelCap: 100, fuelPerLap: 3.12, fuelLaps: 13.6,
+    tc: 3, abs: 2, map: 1, bb: 52.4, water: 88 + 6 * Math.sin(t / 9), oil: 104, turbo: 1.42, lap: 7, pos: 4,
+    tyreT: [58, 80, 92, 108].map((v, i) => v + 3 * Math.sin(t / 5 + i)), tyreP: [1.72, 1.74, 1.69, 1.70], brakeT: [420, 430, 380, 390], tyreWear: [0.97, 0.97, 0.98, 0.98],
+    cur: (t % 90), last: 89.412, best: 88.903, delta: 0.6 * Math.sin(t / 11), sessionLeft: 2400 - t, limiter: (t % 30) > 27, lights: true,
+    tcActive: f > 0.9 && g < 3, absActive: (t % 24) > 20, inPit: false };
+}
+function connectLive() {
+  const es = new EventSource("api/stream");
+  es.onmessage = e => live = JSON.parse(e.data);
+  es.onerror = () => { es.close(); setTimeout(connectLive, 2000); };
+}
+connectLive();
+
+/* ---------------- schema des proprietes par type ---------------- */
+const FIELD_OPTS = RSIMC.FIELDS;
+const FMT = [["num", "Nombre"], ["time", "Temps 1:23.456"], ["time2", "Temps 01:23:45"], ["delta", "Delta ±0.00"], ["clock", "Horloge h:mm:ss"],
+  ["gear", "Rapport R/N/1"], ["pct", "Pourcentage (x100)"], ["onoff", "ON / OFF"], ["text", "Texte brut"]];
+const COMMON = [["x", "X", "num"], ["y", "Y", "num"], ["w", "Largeur", "num"], ["h", "Hauteur", "num"],
+  ["bg", "Fond", "color"], ["radius", "Arrondi", "num"], ["border", "Bordure", "color"], ["borderW", "Épaisseur bordure", "num"], ["opacity", "Opacité (0-1)", "num"]];
+const FONTP = [["font", "Police", "font"], ["size", "Taille", "num"], ["color", "Couleur", "color"], ["bold", "Gras", "bool"], ["glow", "Lueur (px)", "num"]];
+const SCHEMA = {
+  label: [["text", "Texte", "text"], ...FONTP, ["align", "Alignement", ["left", "center", "right"]], ...COMMON],
+  value: [["field", "Télémétrie", "field"], ["format", "Format", FMT], ["decimals", "Décimales", "num"], ["prefix", "Préfixe", "text"], ["suffix", "Suffixe", "text"],
+    ["onText", "Texte si ON", "text"], ["offText", "Texte si OFF", "text"], ["empty", "Si pas de donnée", "text"],
+    ...FONTP, ["align", "Alignement", ["left", "center", "right"]], ["pad", "Marge texte", "num"],
+    ["label", "Titre", "text"], ["labelFont", "Police titre", "font"], ["labelSize", "Taille titre", "num"], ["labelColor", "Couleur titre", "color"],
+    ["labelAlign", "Position titre", ["left", "center"]], ...COMMON],
+  gear: [...FONTP, ...COMMON],
+  bar: [["field", "Télémétrie", "field"], ["min", "Min", "num"], ["max", "Max", "num"], ["maxField", "Max = télémétrie", "field"],
+    ["orient", "Sens", [["h", "Horizontal"], ["v", "Vertical"]]], ["color", "Couleur", "color"], ["offColor", "Couleur éteinte", "color"],
+    ["segments", "Segments (0 = plein)", "num"], ["gap", "Écart segments", "num"], ["zones", "Zones de couleur", "bool"],
+    ["zone1", "Zone 2 à partir de (0-1)", "num"], ["zoneColor1", "Couleur zone 2", "color"], ["zone2", "Zone 3 à partir de (0-1)", "num"], ["zoneColor2", "Couleur zone 3", "color"], ...COMMON],
+  leds: [["count", "Nombre de LEDs", "num"], ["mode", "Allumage", [["lr", "Gauche → droite"], ["rl", "Droite → gauche"], ["center", "Bords → centre"]]],
+    ["orient", "Sens", [["h", "Horizontal"], ["v", "Vertical"]]], ["shape", "Forme", [["dot", "Rond"], ["glass", "Verre (authentique)"], ["rect", "Rectangle"], ["bar", "Barre"]]], ["size", "Taille LED (0-1)", "num"],
+    ["start", "Début (0-1 du régime max)", "num"], ["shift", "Passage rapport (0-1)", "num"], ["c1", "Couleur 1", "color"], ["c2", "Couleur 2", "color"],
+    ["c3", "Couleur 3", "color"], ["flash", "Couleur flash / limiteur", "color"], ["offColor", "Couleur éteinte", "color"], ["glow", "Lueur (0 = aucune)", "num"], ...COMMON],
+  gauge: [["field", "Télémétrie", "field"], ["min", "Min", "num"], ["max", "Max", "num"], ["maxField", "Max = télémétrie", "field"], ["step", "Graduation", "num"],
+    ["div", "Diviser les chiffres par", "num"], ["redFrom", "Zone rouge dès", "num"], ["label", "Texte", "text"], ["font", "Police", "font"],
+    ["face", "Fond cadran", "color"], ["ink", "Graduations", "color"], ["needle", "Aiguille", "color"], ["red", "Zone rouge", "color"],
+    ["x", "X", "num"], ["y", "Y", "num"], ["w", "Largeur", "num"], ["h", "Hauteur", "num"], ["border", "Bordure", "color"], ["borderW", "Épaisseur bordure", "num"]],
+  tyres: [["show", "Afficher", [["temp", "Température"], ["pressure", "Pression"]]], ["font", "Police", "font"], ["size", "Taille", "num"], ["color", "Couleur texte", "color"],
+    ["coldMax", "Froid sous (°C)", "num"], ["okMax", "OK sous (°C)", "num"], ["hotMax", "Chaud sous (°C)", "num"],
+    ["cold", "Couleur froid", "color"], ["ok", "Couleur OK", "color"], ["warm", "Couleur chaud", "color"], ["hot", "Couleur surchauffe", "color"], ["gap", "Écart", "num"], ...COMMON],
+  button: [["style", "Style", [["plain", "Simple"], ["pill", "Arrondi"], ["round", "Rond chromé"], ["start", "Démarrer / arrêter moteur"], ["image", "Image perso"]]],
+    ["text", "Texte", "text"], ["text1", "Texte haut (moteur)", "text"], ["text2", "Texte bas (moteur)", "text"], ["src", "Image", "image"],
+    ["ledField", "LED allumée si (télémétrie)", "field"], ...FONTP, ["pressBg", "Fond appuyé", "color"], ["pressColor", "Texte appuyé", "color"], ...COMMON],
+  switch: [["style", "Style", [["rocker", "Bascule lumineuse"], ["roundLed", "Rond LED"], ["round", "Rond"], ["square", "Carré"], ["kill", "Killswitch (capot)"], ["toggle", "Levier métal"]]],
+    ["color", "Couleur allumé", "color"], ["capColor", "Couleur capot (killswitch)", "text"], ["text", "Étiquette dessous", "text"], ["font", "Police", "font"], ["size", "Taille étiquette", "num"],
+    ["labelColor", "Couleur étiquette", "color"], ["x", "X", "num"], ["y", "Y", "num"], ["w", "Largeur", "num"], ["h", "Hauteur", "num"]],
+  panel: [["style", "Style", [["carbon", "Carbone 1"], ["carbon2", "Carbone 2"], ["carbonDiag", "Carbone diagonal"], ["display", "Écran course"], ["lcd", "LCD demi-lune"],
+      ["gradient", "Dégradé"], ["grid", "Grille d'écran"], ["brushed", "Alu brossé"], ["solid", "Couleur unie"], ["image", "Image perso"]]],
+    ["color", "Couleur 1", "color"], ["color2", "Couleur 2", "color"], ["src", "Image", "image"], ["fit", "Ajustement image", [["cover", "Remplir"], ["contain", "Contenir"], ["stretch", "Étirer"]]], ...COMMON],
+  lamp: [["icon", "Icône", [["abs", "ABS"], ["tc", "TC / antipatinage"], ["fuel", "Carburant"], ["lights", "Phares"], ["engine", "Moteur"], ["water", "Temp. eau"], ["pit", "PIT"], ["flag", "Drapeau"], ["dot", "Pastille"], ["text", "Texte"]]],
+    ["field", "Allumé si (télémétrie)", "field"], ["op", "Condition", [">", ">=", "<", "<=", "==", "!="]], ["v", "Valeur", "text"], ["blink", "Clignote", "bool"],
+    ["onColor", "Couleur allumé", "color"], ["offColor", "Couleur éteint", "color"], ["text", "Texte (icône texte)", "text"], ["font", "Police", "font"], ["size", "Taille texte", "num"], ["glow", "Lueur", "num"], ...COMMON],
+  gear7: [["color", "Couleur segments", "color"], ["offColor", "Segments éteints", "color"], ["glow", "Lueur", "num"], ...COMMON],
+  arcbar: [["field", "Télémétrie", "field"], ["min", "Min", "num"], ["max", "Max", "num"], ["maxField", "Max = télémétrie", "field"], ["segments", "Segments", "num"],
+    ["thickness", "Épaisseur", "num"], ["from", "Début (x π)", "num"], ["to", "Fin (x π)", "num"], ["color", "Couleur", "color"], ["zone1", "Zone 2 dès (0-1)", "num"], ["zoneColor1", "Couleur zone 2", "color"],
+    ["zone2", "Zone 3 dès (0-1)", "num"], ["zoneColor2", "Couleur zone 3", "color"], ["offColor", "Couleur éteinte", "color"], ...COMMON],
+  image: [["src", "Image", "image"], ["fit", "Ajustement", [["contain", "Contenir"], ["cover", "Remplir"], ["stretch", "Étirer"]]], ...COMMON],
+  rect: [...COMMON],
+};
+const TYPE_NAMES = { panel: "Fond / cadre", lamp: "Voyant", gear7: "Rapport 7 segments", arcbar: "Barre en arc", image: "Image", switch: "Interrupteur", value: "Valeur télémétrie", gear: "Rapport", leds: "LEDs de régime", bar: "Barre / jauge", gauge: "Compteur à aiguille",
+  tyres: "Pneus (4 roues)", label: "Texte", rect: "Forme / cadre", button: "Bouton tactile" };
+
+/* ---------------- dashboards : chargement / sauvegarde ---------------- */
+async function listDashes(selectId) {
+  const l = await (await fetch("api/dashboards")).json();
+  const s = $("dashSel"); s.innerHTML = "";
+  l.forEach(x => { const o = document.createElement("option"); o.value = x.id; o.textContent = x.name; s.appendChild(o); });
+  if (!l.length) { newDash(true); return; }
+  s.value = selectId || l[0].id; await openDash(s.value);
+}
+async function openDash(id) {
+  if (dirty && !confirm("Modifications non enregistrées. Continuer ?")) { $("dashSel").value = dash.id; return; }
+  dash = await (await fetch("api/dashboard?id=" + encodeURIComponent(id))).json();
+  page = 0; sel = null; dirty = false; refreshAll();
+}
+function template() {
+  return { id: "", name: "Mon dash", match: [], bg: "#000000", pages: [{ name: "Course", bg: "#000000", widgets: [
+    { id: uid(), type: "leds", x: 20, y: 8, ...RSIMC.DEFAULTS.leds, w: 960, h: 34 },
+    { id: uid(), type: "gear", x: 400, y: 60, ...RSIMC.DEFAULTS.gear, w: 200, h: 240 },
+    { id: uid(), type: "value", x: 400, y: 310, ...RSIMC.DEFAULTS.value, w: 200, h: 70, label: "KM/H", align: "center", labelAlign: "center" },
+    { id: uid(), type: "value", x: 20, y: 60, ...RSIMC.DEFAULTS.value, field: "delta", format: "delta", decimals: 2, label: "DELTA", w: 360, h: 90,
+      rules: [{ op: "<", v: 0, color: "#00e13c" }, { op: ">", v: 0, color: "#ff3b30" }] },
+    { id: uid(), type: "value", x: 20, y: 160, ...RSIMC.DEFAULTS.value, field: "last", format: "time", label: "DERNIER", w: 360, h: 80 },
+    { id: uid(), type: "value", x: 20, y: 250, ...RSIMC.DEFAULTS.value, field: "best", format: "time", label: "MEILLEUR", w: 360, h: 80, color: "#c86bff" },
+    { id: uid(), type: "value", x: 620, y: 60, ...RSIMC.DEFAULTS.value, field: "tc", label: "TC", w: 175, h: 90, rules: [{ field: "tcActive", op: "==", v: 1, bg: "#1a2ee0" }] },
+    { id: uid(), type: "value", x: 805, y: 60, ...RSIMC.DEFAULTS.value, field: "abs", label: "ABS", w: 175, h: 90, rules: [{ field: "absActive", op: "==", v: 1, bg: "#d08a00" }] },
+    { id: uid(), type: "value", x: 620, y: 160, ...RSIMC.DEFAULTS.value, field: "fuel", decimals: 1, label: "FUEL L", w: 175, h: 80 },
+    { id: uid(), type: "value", x: 805, y: 160, ...RSIMC.DEFAULTS.value, field: "bb", decimals: 1, label: "BB", w: 175, h: 80 },
+    { id: uid(), type: "tyres", x: 620, y: 250, ...RSIMC.DEFAULTS.tyres, w: 360, h: 130 },
+    { id: uid(), type: "label", x: 400, y: 390, ...RSIMC.DEFAULTS.label, text: "PIT LIMITER", w: 200, h: 44, bg: "#2f7bff", radius: 8, showIf: { field: "limiter", op: "==", v: 1 } },
+    { id: uid(), type: "button", x: 20, y: 360, ...RSIMC.DEFAULTS.button, text: "PAGE ▶", action: "page_next", bg: "#333333", w: 160, h: 70 },
+  ] }, { name: "Pneus", bg: "#000000", widgets: [
+    { id: uid(), type: "tyres", x: 250, y: 40, ...RSIMC.DEFAULTS.tyres, w: 500, h: 280, size: 60 },
+    { id: uid(), type: "button", x: 20, y: 360, ...RSIMC.DEFAULTS.button, text: "◀ PAGE", action: "page_prev", bg: "#333333", w: 160, h: 70 },
+  ] }] };
+}
+function newDash(silent) {
+  if (!silent && dirty && !confirm("Modifications non enregistrées. Continuer ?")) return;
+  dash = template(); dash.id = "dash_" + uid(); page = 0; sel = null; dirty = true; refreshAll();
+  if (!silent) toast("Nouveau dashboard (modèle de départ) — pense à enregistrer");
+}
+async function save() {
+  dash.name = $("dName").value || "Mon dash";
+  dash.match = $("dMatch").value.split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+  const clean = JSON.parse(JSON.stringify(dash, (k, v) => k.startsWith("_") ? undefined : v));
+  const r = await (await fetch("api/dashboard", { method: "POST", body: JSON.stringify(clean) })).json();
+  dirty = false; dash.id = r.id; await listDashes(r.id); toast("Enregistré ✔ (le téléphone se met à jour)");
+}
+$("bNew").onclick = () => newDash(false);
+$("bDup").onclick = () => { const c = JSON.parse(JSON.stringify(dash)); c.id = "dash_" + uid(); c.name = dash.name + " (copie)"; dash = c; dirty = true; refreshAll(); toast("Copie créée — enregistre-la"); };
+$("bDel").onclick = async () => { if (!confirm("Supprimer « " + dash.name + " » ?")) return;
+  await fetch("api/dashboard/delete", { method: "POST", body: JSON.stringify({ id: dash.id }) }); dirty = false; listDashes(); };
+$("bSave").onclick = save;
+$("dashSel").onchange = e => openDash(e.target.value);
+$("dName").oninput = () => { dash.name = $("dName").value; dirty = true; };
+$("dMatch").oninput = () => dirty = true;
+$("bAssign").onclick = async () => {
+  if (!live.connected) return toast("Aucun jeu en cours");
+  if (dirty) await save();
+  await fetch("api/assign", { method: "POST", body: JSON.stringify({ game: live.game, car: live.car, profile: "custom:" + dash.id }) });
+  toast("« " + dash.name + " » attribué à " + live.car);
+};
+
+/* ---------------- pages ---------------- */
+function curPage() { return dash.pages[page]; }
+function renderPages() {
+  const p = $("pages"); p.innerHTML = "";
+  dash.pages.forEach((pg, i) => {
+    const b = document.createElement("button"); b.textContent = (i + 1) + ". " + (pg.name || "Page"); if (i === page) b.className = "on";
+    b.onclick = () => { page = i; sel = null; refreshAll(); };
+    b.ondblclick = () => { const n = prompt("Nom de la page", pg.name); if (n !== null) { pg.name = n; dirty = true; renderPages(); } };
+    p.appendChild(b);
+  });
+  const add = document.createElement("button"); add.textContent = "+ page";
+  add.onclick = () => { dash.pages.push({ name: "Page " + (dash.pages.length + 1), bg: dash.bg || "#000000", widgets: [] }); page = dash.pages.length - 1; dirty = true; refreshAll(); };
+  p.appendChild(add);
+  if (dash.pages.length > 1) { const del = document.createElement("button"); del.textContent = "− page"; del.className = "dan";
+    del.onclick = () => { if (confirm("Supprimer la page ?")) { dash.pages.splice(page, 1); page = 0; sel = null; dirty = true; refreshAll(); } }; p.appendChild(del); }
+  const s = document.createElement("span"); s.className = "hint"; s.textContent = "  (double-clic = renommer)"; p.appendChild(s);
+  $("pageBg").value = curPage().bg || "";
+}
+$("pageBg").oninput = e => { curPage().bg = e.target.value; dirty = true; };
+
+/* ---------------- calques ---------------- */
+function renderLayers() {
+  const L = $("layers"); L.innerHTML = "";
+  curPage().widgets.slice().reverse().forEach(w => {
+    const d = document.createElement("div"); if (w === sel) d.className = "on";
+    const nm = w.type === "value" ? (w.label || w.field) : w.type === "label" || w.type === "button" ? w.text : TYPE_NAMES[w.type];
+    d.innerHTML = `<span>${TYPE_NAMES[w.type] ? w.type : "?"} · ${String(nm || "").slice(0, 16)}</span><span><a data-m="up">▲</a> <a data-m="dn">▼</a></span>`;
+    d.onclick = e => {
+      const arr = curPage().widgets, i = arr.indexOf(w);
+      if (e.target.dataset.m === "up" && i < arr.length - 1) { arr.splice(i, 1); arr.splice(i + 1, 0, w); dirty = true; }
+      else if (e.target.dataset.m === "dn" && i > 0) { arr.splice(i, 1); arr.splice(i - 1, 0, w); dirty = true; }
+      sel = w; renderLayers(); renderProps();
+    };
+    L.appendChild(d);
+  });
+}
+function addWidget(type, props) {
+  const w = { id: uid(), type, ...JSON.parse(JSON.stringify(RSIMC.DEFAULTS[type] || {})), ...JSON.parse(JSON.stringify(props || {})) };
+  if (w.x === undefined) w.x = Math.round((1000 - w.w) / 2 / 5) * 5;
+  if (w.y === undefined) w.y = Math.round((450 - w.h) / 2 / 5) * 5;
+  w.x = Math.max(0, Math.min(w.x, 1000 - w.w)); w.y = Math.max(0, Math.min(w.y, 450 - w.h));
+  if (type === "panel") curPage().widgets.unshift(w); else curPage().widgets.push(w);   // les fonds vont tout en dessous
+  sel = w; dirty = true; renderLayers(); renderProps();
+}
+const AB = $("addBtns");
+Object.keys(TYPE_NAMES).forEach(t => {
+  const b = document.createElement("button"); b.textContent = "+ " + TYPE_NAMES[t];
+  b.onclick = () => addWidget(t); AB.appendChild(b);
+});
+
+/* ---------------- catalogue facon SimDashboard ---------------- */
+let catIdx = 0, catPrev = [];
+function openCatalog() {
+  const L = $("catList"); L.innerHTML = "";
+  RSIMC.CATALOG.forEach(([name, ico], i) => {
+    const d = document.createElement("div"); d.innerHTML = `<span style="font-size:24px;width:30px;text-align:center">${ico}</span>${name}`;
+    if (i === catIdx) d.className = "on"; d.onclick = () => { catIdx = i; openCatalog(); }; L.appendChild(d);
+  });
+  const I = $("catItems"); I.innerHTML = ""; catPrev = [];
+  RSIMC.CATALOG[catIdx][2].forEach(([name, type, props]) => {
+    const it = document.createElement("div"); it.className = "it";
+    it.innerHTML = `<div><b>${name}</b><small>${TYPE_NAMES[type] || type} · personnalisable</small></div>`;
+    const cvp = document.createElement("canvas"); cvp.width = 440; cvp.height = 198; it.appendChild(cvp);
+    catPrev.push([cvp, type, props]);
+    it.onclick = () => { $("cat").style.display = "none"; addWidget(type, props); toast(name + " ajouté"); };
+    I.appendChild(it);
+  });
+  $("cat").style.display = "flex";
+}
+function drawCatalog(t) {
+  if ($("cat").style.display !== "flex") return;
+  const d = demo(t);
+  catPrev.forEach(([cvp, type, props]) => {
+    const c = cvp.getContext("2d"), w = { type, ...RSIMC.DEFAULTS[type], ...props };
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, 440, 198);
+    const ww = type === "panel" ? 1000 : w.w, hh = type === "panel" ? 450 : w.h;
+    const k = Math.min(420 / ww, 180 / hh);
+    c.setTransform(k, 0, 0, k, (440 - ww * k) / 2, (198 - hh * k) / 2);
+    RSIMC.drawWidget(c, Object.assign(w, { x: 0, y: 0, w: ww, h: hh }), JSON.parse(JSON.stringify(d)), t);
+  });
+}
+$("bCatalog").onclick = openCatalog; $("fAdd").onclick = openCatalog;
+$("catClose").onclick = () => $("cat").style.display = "none";
+$("cat").onclick = e => { if (e.target.id === "cat") $("cat").style.display = "none"; };
+
+/* ---------------- panneau proprietes ---------------- */
+function colorInput(get, set) {
+  const wrap = document.createElement("div"); wrap.className = "col";
+  const pick = document.createElement("input"); pick.type = "color";
+  const tx = document.createElement("input"); tx.placeholder = "aucune";
+  const sync = () => { tx.value = get() || ""; pick.value = /^#[0-9a-f]{6}$/i.test(get() || "") ? get() : "#000000"; };
+  pick.oninput = () => { set(pick.value); tx.value = pick.value; };
+  tx.onchange = () => { set(tx.value.trim()); sync(); };
+  sync(); wrap.append(pick, tx); return wrap;
+}
+function selectInput(opts, val, set) {
+  const s = document.createElement("select");
+  const e = document.createElement("option"); e.value = ""; e.textContent = "—"; s.appendChild(e);
+  opts.forEach(o => { const [v, l] = Array.isArray(o) ? o : [o, o]; const op = document.createElement("option"); op.value = v; op.textContent = l; s.appendChild(op); });
+  s.value = val ?? ""; s.onchange = () => set(s.value); return s;
+}
+let KEYS = [];
+fetch("api/bindings").then(r => r.json()).then(j => { KEYS = j.keys; BINDS = j.binds; renderBinds(); });
+function actionInput(val, set) {
+  const wrap = document.createElement("div"); wrap.className = "col";
+  const kind = (val || "").startsWith("key:") ? "key" : (val || "");
+  const s = selectInput([["page_next", "Page suivante"], ["page_prev", "Page précédente"], ["dash_next", "Dashboard suivant"], ["dash_prev", "Dashboard précédent"],
+    ["dash_auto", "Dashboard auto (voiture)"], ["key", "Touche clavier → jeu"]], kind, v => { set(v === "key" ? "key:" + (k.value || "S") : v); renderProps(); });
+  const k = document.createElement("input"); k.placeholder = "ex: S, LCTRL+F1"; k.style.width = "90px";
+  k.value = kind === "key" ? val.slice(4) : ""; k.style.display = kind === "key" ? "" : "none";
+  k.setAttribute("list", "keylist"); k.onchange = () => set("key:" + k.value.toUpperCase());
+  wrap.append(s, k); return wrap;
+}
+function rulesEditor(w) {
+  const box = document.createElement("div");
+  const head = document.createElement("h3"); head.textContent = "Règles de couleur (1re qui correspond)"; box.appendChild(head);
+  const hint = document.createElement("div"); hint.className = "hint";
+  hint.textContent = w.type === "gear" ? "Valeur testée par défaut : régime en % du max." : "Valeur testée par défaut : la télémétrie du widget. Tu peux tester une autre donnée.";
+  box.appendChild(hint);
+  (w.rules || []).forEach((r, i) => {
+    const d = document.createElement("div"); d.className = "rule";
+    d.append(selectInput(FIELD_OPTS.map(([k, l]) => [k, l]), r.field || "", v => { r.field = v || undefined; dirty = true; }),
+      selectInput([">", ">=", "<", "<=", "==", "!=", "nil"], r.op, v => { r.op = v; dirty = true; }));
+    const v = document.createElement("input"); v.value = r.v ?? ""; v.oninput = () => { r.v = v.value; dirty = true; }; d.append(v);
+    const f1 = document.createElement("div"); f1.className = "full";
+    f1.append("texte", colorInput(() => r.color, x => { r.color = x; dirty = true; }), "fond", colorInput(() => r.bg, x => { r.bg = x; dirty = true; }));
+    const f2 = document.createElement("div"); f2.className = "full";
+    const bl = document.createElement("input"); bl.type = "checkbox"; bl.checked = !!r.blink; bl.onchange = () => { r.blink = bl.checked; dirty = true; };
+    const del = document.createElement("button"); del.textContent = "supprimer"; del.onclick = () => { w.rules.splice(i, 1); dirty = true; renderProps(); };
+    f2.append(bl, "clignote", del);
+    d.append(f1, f2); box.appendChild(d);
+  });
+  const add = document.createElement("button"); add.textContent = "+ règle";
+  add.onclick = () => { (w.rules = w.rules || []).push({ op: ">", v: 0, color: "#ff3b30" }); dirty = true; renderProps(); };
+  box.appendChild(add);
+  // visibilite
+  const h2 = document.createElement("h3"); h2.textContent = "Afficher seulement si"; box.appendChild(h2);
+  const si = w.showIf || {}; const d = document.createElement("div"); d.className = "rule";
+  d.append(selectInput(FIELD_OPTS.map(([k, l]) => [k, l]), si.field || "", v => { w.showIf = v ? { ...(w.showIf || { op: "==", v: 1 }), field: v } : undefined; dirty = true; renderProps(); }),
+    selectInput([">", ">=", "<", "<=", "==", "!="], si.op || "==", v => { if (w.showIf) { w.showIf.op = v; dirty = true; } }));
+  const v = document.createElement("input"); v.value = si.v ?? 1; v.oninput = () => { if (w.showIf) { w.showIf.v = v.value; dirty = true; } }; d.append(v);
+  box.appendChild(d);
+  return box;
+}
+function renderProps() {
+  const P = $("props"); P.innerHTML = "";
+  if (!sel) { P.innerHTML = '<div class="hint">Sélectionne un élément pour le régler.<br><br>Astuce : un widget « Valeur » + une règle « fond » sur « TC actif == 1 » fait clignoter la case quand le TC intervient.</div>'; return; }
+  const w = sel, h = document.createElement("h3"); h.textContent = TYPE_NAMES[w.type]; P.appendChild(h);
+  for (const [k, label, kind] of SCHEMA[w.type]) {
+    const row = document.createElement("div"); row.className = "row";
+    const l = document.createElement("label"); l.textContent = label; row.appendChild(l);
+    const set = v => { w[k] = v; dirty = true; };
+    let inp;
+    if (kind === "num") { inp = document.createElement("input"); inp.type = "number"; inp.step = "any"; inp.value = w[k] ?? "";
+      inp.oninput = () => set(inp.value === "" ? undefined : +inp.value); }
+    else if (kind === "text") { inp = document.createElement("input"); inp.value = w[k] ?? ""; inp.oninput = () => set(inp.value); }
+    else if (kind === "color") inp = colorInput(() => w[k], set);
+    else if (kind === "bool") { inp = document.createElement("input"); inp.type = "checkbox"; inp.style.width = "auto"; inp.checked = !!w[k]; inp.onchange = () => set(inp.checked); }
+    else if (kind === "font") { inp = selectInput(RSIMC.FONT_LIST, w[k], set); [...inp.options].forEach(o => o.style.fontFamily = o.value); }
+    else if (kind === "field") inp = selectInput(FIELD_OPTS.map(([a, b]) => [a, b]), w[k], v => set(v || undefined));
+    else if (kind === "action") inp = actionInput(w[k], set);
+    else if (kind === "image") inp = imageInput(w, k);
+    else inp = selectInput(kind, w[k], set);
+    row.appendChild(inp); P.appendChild(row);
+  }
+  if (w.type === "button" || w.type === "switch") P.appendChild(keysEditor(w));
+  if (["value", "label", "gear", "gear7", "bar", "rect", "image"].includes(w.type)) P.appendChild(rulesEditor(w));
+  const del = document.createElement("button"); del.className = "dan"; del.style.marginTop = "12px"; del.textContent = "Supprimer l'élément";
+  del.onclick = () => removeSel(); P.appendChild(del);
+}
+function imageInput(w, k) {
+  const wrap = document.createElement("div"); wrap.className = "col";
+  const f = document.createElement("input"); f.type = "file"; f.accept = "image/*"; f.style.width = "100%";
+  f.onchange = () => {
+    const file = f.files[0]; if (!file) return;
+    const im = new Image(), url = URL.createObjectURL(file);
+    im.onload = () => { // reduit l'image (max 1000 px) pour garder des dashs legers
+      const sc = Math.min(1, 1000 / Math.max(im.width, im.height)), o = document.createElement("canvas");
+      o.width = Math.round(im.width * sc); o.height = Math.round(im.height * sc); o.getContext("2d").drawImage(im, 0, 0, o.width, o.height);
+      w[k] = o.toDataURL(file.type === "image/jpeg" ? "image/jpeg" : "image/png", 0.85); dirty = true; URL.revokeObjectURL(url); toast("Image importée");
+    };
+    im.src = url;
+  };
+  const x = document.createElement("button"); x.textContent = "✕"; x.title = "retirer"; x.onclick = () => { delete w[k]; dirty = true; };
+  wrap.append(f, x); return wrap;
+}
+const MODS = [["LCTRL", "Ctrl gauche"], ["LSHIFT", "Maj gauche"], ["LALT", "Alt gauche"], ["RCTRL", "Ctrl droit"], ["RSHIFT", "Maj droite"], ["RALT", "Alt Gr"]];
+function keysEditor(w) {
+  const box = document.createElement("div"); box.className = "section-keys";
+  const h = document.createElement("h3"); h.textContent = w.type === "switch" ? "Interrupteur : action" : "Bouton : action"; box.appendChild(h);
+  const row = (label, el) => { const r = document.createElement("div"); r.className = "row"; const l = document.createElement("label"); l.textContent = label; r.append(l, el); box.appendChild(r); };
+  const chk = (key, dflt) => { const c = document.createElement("input"); c.type = "checkbox"; c.style.width = "auto"; c.checked = w[key] ?? dflt; c.onchange = () => { w[key] = c.checked; dirty = true; renderProps(); }; return c; };
+  if (!w.act && w.action) { if (w.action.startsWith("key:")) { w.act = "key"; w.key = w.key || w.action.slice(4); } else w.act = w.action; }
+  row("Action", selectInput([["key", "Touche clavier → jeu"], ["page_next", "Page suivante"], ["page_prev", "Page précédente"], ["dash_next", "Dashboard suivant"],
+    ["dash_prev", "Dashboard précédent"], ["dash_auto", "Dashboard auto (voiture)"]], w.act || "key", v => { w.act = v; dirty = true; renderProps(); }));
+  if ((w.act || "key") === "key") {
+    if (w.type === "button") row("Quand envoyer", selectInput([["press", "À l'appui"], ["release", "Au relâchement"], ["hold", "Maintenu (tant que le doigt est posé)"]], w.when || "press", v => { w.when = v; dirty = true; }));
+    row("Modificateur 1", selectInput(MODS, w.mod1, v => { w.mod1 = v || undefined; dirty = true; }));
+    row("Modificateur 2", selectInput(MODS, w.mod2, v => { w.mod2 = v || undefined; dirty = true; }));
+    row("Touche", selectInput(KEYS, w.key, v => { w.key = v || undefined; dirty = true; }));
+    if (w.type === "switch") {
+      row("Touche différente sur OFF", chk("altOff", false));
+      if (w.altOff) {
+        row("OFF : modificateur 1", selectInput(MODS, w.mod1Off, v => { w.mod1Off = v || undefined; dirty = true; }));
+        row("OFF : modificateur 2", selectInput(MODS, w.mod2Off, v => { w.mod2Off = v || undefined; dirty = true; }));
+        row("OFF : touche", selectInput(KEYS, w.keyOff, v => { w.keyOff = v || undefined; dirty = true; }));
+      }
+    }
+  }
+  if (w.type === "switch") {
+    const h2 = document.createElement("h3"); h2.textContent = "État visuel selon le jeu (optionnel)"; box.appendChild(h2);
+    row("Allumé si (télémétrie)", selectInput(FIELD_OPTS, w.stateField, v => { w.stateField = v || undefined; dirty = true; }));
+    row("Condition", selectInput([">", ">=", "<", "<=", "==", "!="], w.stateOp || "==", v => { w.stateOp = v; dirty = true; }));
+    const v = document.createElement("input"); v.value = w.stateV ?? 1; v.oninput = () => { w.stateV = v.value; dirty = true; }; row("Valeur", v);
+    row("Remettre à OFF si jeu fermé", chk("autoReset", true));
+  }
+  row("Vibrer au toucher", chk("vibrate", true));
+  const tb = document.createElement("button"); tb.textContent = "Tester sur le PC"; tb.style.marginTop = "6px";
+  tb.onclick = async () => { const acts = [...RSIMC.pressActions(w, "down", demo(0)), ...RSIMC.pressActions(w, "up", demo(0))];
+    for (const a of acts) await fetch("api/action", { method: "POST", body: JSON.stringify({ action: a }) });
+    toast(acts.length ? "Envoyé : " + acts.join(", ") : "Rien à envoyer (choisis une touche)"); };
+  box.appendChild(tb);
+  return box;
+}
+function removeSel() { if (!sel) return; const a = curPage().widgets; a.splice(a.indexOf(sel), 1); sel = null; dirty = true; renderLayers(); renderProps(); }
+const dl = document.createElement("datalist"); dl.id = "keylist"; document.body.appendChild(dl);
+setTimeout(() => KEYS.forEach(k => { const o = document.createElement("option"); o.value = k; dl.appendChild(o); }), 800);
+
+/* ---------------- souris : selection / deplacement / redimension ---------------- */
+let drag = null;
+function pos(e) { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * 1000 / r.width, (e.clientY - r.top) * 450 / r.height]; }
+let touchMode = false;
+function handleAt(w, x, y) { const s = touchMode ? 26 : 10; return x > w.x + w.w - s && x < w.x + w.w + s && y > w.y + w.h - s && y < w.y + w.h + s; }
+cv.style.touchAction = "none";
+cv.addEventListener("pointerdown", e => {
+  touchMode = e.pointerType === "touch"; cv.setPointerCapture(e.pointerId);
+  const [x, y] = pos(e);
+  if (sel && handleAt(sel, x, y)) { drag = { mode: "rs", w: sel, sx: x, sy: y, ow: sel.w, oh: sel.h }; return; }
+  const ws = curPage().widgets;
+  let hit = null;
+  for (let i = ws.length - 1; i >= 0; i--) { const w = ws[i]; if (x >= w.x && x <= w.x + w.w && y >= w.y && y <= w.y + w.h) { hit = w; break; } }
+  sel = hit; renderLayers(); renderProps();
+  if (hit) drag = { mode: "mv", w: hit, sx: x, sy: y, ox: hit.x, oy: hit.y };
+});
+addEventListener("pointermove", e => {
+  const [x, y] = pos(e);
+  cv.style.cursor = sel && handleAt(sel, x, y) ? "nwse-resize" : "default";
+  if (!drag) return;
+  const w = drag.w;
+  if (drag.mode === "mv") { w.x = snap(drag.ox + x - drag.sx); w.y = snap(drag.oy + y - drag.sy); }
+  else { w.w = Math.max(10, snap(drag.ow + x - drag.sx)); w.h = Math.max(10, snap(drag.oh + y - drag.sy)); }
+  dirty = true;
+});
+addEventListener("pointerup", () => { if (drag) { drag = null; renderProps(); } });
+addEventListener("keydown", e => {
+  const tag = document.activeElement.tagName;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); return; }
+  if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c" && sel) { clip = JSON.stringify(sel); toast("Copié"); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v" && clip) { const w = JSON.parse(clip); w.id = uid(); w.x += 10; w.y += 10; curPage().widgets.push(w); sel = w; dirty = true; renderLayers(); renderProps(); return; }
+  if (!sel) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d") { e.preventDefault(); const w = JSON.parse(JSON.stringify(sel)); w.id = uid(); w.x += 10; w.y += 10; curPage().widgets.push(w); sel = w; dirty = true; renderLayers(); renderProps(); return; }
+  const st = e.shiftKey ? 10 : 1, mv = { ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, -st], ArrowDown: [0, st] }[e.key];
+  if (mv) { e.preventDefault(); sel.x += mv[0]; sel.y += mv[1]; dirty = true; renderProps(); }
+  if (e.key === "Delete") removeSel();
+});
+
+/* ---------------- rendu en boucle ---------------- */
+function loop(ts) {
+  const t = ts / 1000, d = $("dataSrc").value === "live" && live.connected ? live : demo(t);
+  RSIMC.draw(ctx, JSON.parse(JSON.stringify(d)), dash || { pages: [{ widgets: [] }] }, page, t);
+  if (sel) { ctx.save(); ctx.strokeStyle = "#3fd0ff"; ctx.setLineDash([6, 4]); ctx.lineWidth = 2; ctx.strokeRect(sel.x, sel.y, sel.w, sel.h);
+    ctx.setLineDash([]); ctx.fillStyle = "#3fd0ff"; const hs = touchMode ? 22 : 12; ctx.fillRect(sel.x + sel.w - hs / 2, sel.y + sel.h - hs / 2, hs, hs); ctx.restore(); }
+  drawCatalog(t);
+  requestAnimationFrame(loop);
+}
+function refreshAll() { $("dName").value = dash.name || ""; $("dMatch").value = (dash.match || []).join(", "); renderPages(); renderLayers(); renderProps(); }
+addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+/* ---------------- boutons du volant ---------------- */
+let BINDS = [];
+async function renderDevs() {
+  const j = await (await fetch("api/joy")).json();
+  $("devs").textContent = j.devices.length ? "Détectés : " + j.devices.map(d => `#${d[0]} ${d[1]} (${d[2]} boutons)`).join(" · ") : "Aucun volant / joystick détecté (ou pas sous Windows).";
+  return j;
+}
+function renderBinds() {
+  const tb = $("bindRows"); tb.innerHTML = "";
+  BINDS.forEach((b, i) => {
+    const tr = document.createElement("tr");
+    const td = () => { const x = document.createElement("td"); tr.appendChild(x); return x; };
+    td().textContent = b.dev !== undefined ? "#" + b.dev + " " + (b.devName || "") : "—";
+    td().textContent = b.btn ? "Bouton " + b.btn + (b.btn > 32 ? " (croix)" : "") : "—";
+    const kind = (b.action || "").startsWith("key:") ? "key" : b.action;
+    td().appendChild(selectInput([["page_next", "Page suivante"], ["page_prev", "Page précédente"], ["dash_next", "Dashboard suivant"], ["dash_prev", "Dashboard précédent"],
+      ["dash_auto", "Dashboard auto"], ["key", "Touche clavier → jeu"]], kind, v => { b.action = v === "key" ? "key:S" : v; renderBinds(); }));
+    const k = document.createElement("input"); k.setAttribute("list", "keylist"); k.value = kind === "key" ? b.action.slice(4) : ""; k.disabled = kind !== "key";
+    k.onchange = () => b.action = "key:" + k.value.toUpperCase(); td().appendChild(k);
+    const c = td();
+    const cap = document.createElement("button"); cap.textContent = "Capturer";
+    cap.onclick = async () => {
+      cap.textContent = "Appuie sur un bouton…"; const t0 = (await renderDevs()).now;
+      for (let n = 0; n < 100; n++) { await new Promise(r => setTimeout(r, 100)); const j = await (await fetch("api/joy")).json();
+        if (j.last && j.last[2] > t0) { b.dev = j.last[0]; b.btn = j.last[1]; const dv = j.devices.find(d => d[0] === b.dev); b.devName = dv ? dv[1] : ""; break; } }
+      renderBinds();
+    };
+    const del = document.createElement("button"); del.textContent = "✕"; del.onclick = () => { BINDS.splice(i, 1); renderBinds(); };
+    c.append(cap, " ", del); tb.appendChild(tr);
+  });
+}
+$("bAddBind").onclick = () => { BINDS.push({ action: "page_next" }); renderBinds(); };
+$("bSaveBinds").onclick = async () => { await fetch("api/bindings", { method: "POST", body: JSON.stringify({ binds: BINDS.filter(b => b.btn) }) }); toast("Boutons enregistrés ✔"); };
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b));
+  $("editView").style.display = b.dataset.t === "edit" ? "" : "none"; $("bindView").style.display = b.dataset.t === "binds" ? "" : "none";
+  if (b.dataset.t === "binds") renderDevs();
+});
+
+const leftAside = document.querySelector("#editView > aside"), propsAside = $("props");
+$("fProps").onclick = () => { leftAside.classList.remove("open"); propsAside.classList.toggle("open"); if (!sel) toast("Touche d'abord un élément"); };
+$("fLayers").onclick = () => { propsAside.classList.remove("open"); leftAside.classList.toggle("open"); };
+$("fDel").onclick = () => { if (sel && confirm("Supprimer l'élément ?")) removeSel(); };
+$("fDup").onclick = () => { if (!sel) return; const w = JSON.parse(JSON.stringify(sel)); w.id = uid(); w.x += 10; w.y += 10; curPage().widgets.push(w); sel = w; dirty = true; renderLayers(); renderProps(); };
+$("bMore").onclick = () => document.querySelector("header").classList.toggle("open");
+cv.addEventListener("pointerdown", () => { leftAside.classList.remove("open"); propsAside.classList.remove("open"); });
+const QS = new URLSearchParams(location.search);
+listDashes(QS.get("id") || undefined).then(() => {
+  if (QS.get("new")) newDash(true), toast("Nouveau dashboard (modèle de départ) — pense à enregistrer");
+  if (QS.get("tab") === "binds") document.querySelector('#tabs button[data-t=binds]').click();
+  requestAnimationFrame(loop);
+});
+</script>
+</body>
+</html>

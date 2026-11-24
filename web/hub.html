@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>RSIM Dash</title>
+<link rel="icon" href="icon-192.png">
+<style>
+  :root { --bg:#0b0e12; --p:#11161d; --p2:#161c24; --b:#232c37; --t:#e6edf3; --m:#8fa3b5; --a:#3fd0ff; --g:#21e05d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--t); font:14px/1.4 "Segoe UI", Roboto, sans-serif; }
+  header { display:flex; align-items:center; gap:16px; padding:14px 24px; background:var(--p); border-bottom:1px solid var(--b); position:sticky; top:0; z-index:5; }
+  header img { width:40px; height:40px; border-radius:9px; }
+  header h1 { font-size:20px; margin:0; letter-spacing:.5px; }
+  nav { display:flex; gap:6px; margin-left:24px; }
+  nav button { background:none; border:0; color:var(--m); font:inherit; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer; }
+  nav button.on { background:#1d3b66; color:#fff; }
+  .live { margin-left:auto; text-align:right; font-size:13px; color:var(--m); }
+  .live b { color:var(--t); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:#555; margin-right:6px; }
+  .dot.on { background:var(--g); box-shadow:0 0 8px var(--g); }
+  main { padding:20px 24px; }
+  section { display:none; } section.on { display:block; }
+  h2 { font-size:13px; color:var(--a); text-transform:uppercase; letter-spacing:1px; margin:0 0 12px; display:flex; align-items:center; gap:12px; }
+  button, select, input { font:inherit; color:var(--t); background:var(--p2); border:1px solid var(--b); border-radius:7px; padding:6px 10px; }
+  button { cursor:pointer; } button:hover { border-color:var(--a); }
+  .pri { background:#1d6fe0; border-color:#1d6fe0; } .dan { background:#4a1a1a; border-color:#6a2525; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:14px; margin-bottom:28px; }
+  .card { background:var(--p); border:1px solid var(--b); border-radius:12px; overflow:hidden; }
+  .card.cur { border-color:var(--g); box-shadow:0 0 0 1px var(--g); }
+  .card canvas { width:100%; display:block; background:#000; aspect-ratio:1000/450; }
+  .card .info { padding:10px 12px; }
+  .card .name { font-weight:600; display:flex; justify-content:space-between; gap:8px; }
+  .card .sub { color:var(--m); font-size:12px; margin:2px 0 8px; }
+  .card .act { display:flex; gap:6px; flex-wrap:wrap; }
+  .card .act button { padding:4px 9px; font-size:12px; }
+  .tag { font-size:11px; padding:1px 7px; border-radius:20px; background:#223; color:var(--m); white-space:nowrap; }
+  .tag.c { background:#1d3b66; color:#cfe3ff; }
+  table { width:100%; border-collapse:collapse; background:var(--p); border:1px solid var(--b); border-radius:12px; overflow:hidden; }
+  td, th { padding:9px 12px; border-bottom:1px solid var(--b); text-align:left; } th { color:var(--m); font-weight:600; }
+  .phone { display:grid; grid-template-columns:auto 1fr; gap:24px; align-items:start; background:var(--p); border:1px solid var(--b); border-radius:12px; padding:20px; }
+  .url { font-size:30px; font-weight:700; color:#fff; letter-spacing:.5px; }
+  ol { margin:8px 0 0; padding-left:20px; color:var(--m); } ol li { margin:4px 0; }
+  .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#1d6fe0; padding:9px 18px; border-radius:9px; display:none; z-index:9; }
+</style>
+</head>
+<body>
+<header>
+  <img src="icon-192.png" alt="">
+  <a href="index.html" style="color:inherit;text-decoration:none"><h1>RSIM · DASHBOARDS</h1></a>
+  <nav>
+    <button data-s="dashes" class="on">Dashboards</button>
+    <button data-s="cars">Voitures</button>
+    <button data-s="phone">Téléphone</button>
+    <button data-s="buttons">Boutons volant</button>
+  </nav>
+  <div class="live" id="live">…</div>
+</header>
+<main>
+  <section id="s-dashes" class="on">
+    <h2>Mes dashboards <button class="pri" id="bNew">+ Créer un dashboard</button> <button id="bAuto">Revenir au dash automatique</button></h2>
+    <div class="grid" id="gCustom"></div>
+    <h2>Dashboards intégrés</h2>
+    <div class="grid" id="gBuilt"></div>
+  </section>
+
+  <section id="s-cars">
+    <h2>Voitures détectées</h2>
+    <p style="color:var(--m)">Chaque voiture roulée apparaît ici avec le nom exact envoyé par le jeu. Choisis son dashboard : c'est mémorisé.</p>
+    <table><thead><tr><th>Jeu</th><th>Nom envoyé par le jeu</th><th>Classe</th><th>Dashboard</th></tr></thead><tbody id="seen"></tbody></table>
+  </section>
+
+  <section id="s-phone">
+    <h2>Connecter le téléphone</h2>
+    <div class="phone">
+      <img src="icon-192.png" style="width:120px;border-radius:24px" alt="">
+      <div>
+        <div style="color:var(--m)">Adresse à ouvrir dans Chrome sur le téléphone (même Wi-Fi) :</div>
+        <div class="url" id="url">…</div>
+        <ol>
+          <li>Ouvre cette adresse dans Chrome.</li>
+          <li>Menu ⋮ → <b>Ajouter à l'écran d'accueil</b> : l'icône RS DASH apparaît.</li>
+          <li>Touche l'écran pour passer en plein écran ; appui long = menu (dash, orientation verrouillée).</li>
+        </ol>
+        <p style="color:var(--m)">Astuce : donne une IP fixe au PC dans ta box pour que l'icône du téléphone marche toujours.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-buttons">
+    <h2>Boutons du volant</h2>
+    <p style="color:var(--m)">Les boutons du G29 (ou de la Moza / button box) peuvent changer de page, de dashboard, ou envoyer une touche au jeu.</p>
+    <button class="pri" onclick="location.href='editor.html?tab=binds'">Configurer les boutons</button>
+    <div id="bindList" style="margin-top:14px"></div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+<script src="api.js"></script>
+<script>if (RSIMAPI.needsSetup) location.href = "settings.html?first=1";</script>
+<script src="dash.js"></script>
+<script src="custom.js"></script>
+<script src="widgets.js"></script>
+<script>
+"use strict";
+RSIMC.loadFonts();
+const $ = id => document.getElementById(id);
+const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 2000); };
+const post = (u, b) => fetch(u, { method: "POST", body: JSON.stringify(b || {}) }).then(r => r.json());
+let state = { frame: {} }, profiles = [], customs = {}, demo = false, thumbs = [];
+
+const sample = { connected: true, gear: 4, rpm: 7000, maxRpm: 8000, shiftRpm: 0, speed: 187, throttle: 1, brake: 0, clutch: 0, fuel: 42.6, fuelCap: 100,
+  fuelPerLap: 3.1, fuelLaps: 13.7, tc: 3, abs: 2, map: 1, bb: 52.4, limiter: false, lights: true, water: 91, oil: 104, turbo: 1.42,
+  tyreT: [62, 84, 92, 107], tyreP: [1.72, 1.74, 1.69, 1.70], brakeT: [450, 460, 380, 390], tyreWear: [0.98, 0.98, 0.99, 0.99],
+  lap: 7, pos: 4, cur: 41.233, last: 89.412, best: 88.903, delta: -0.214, sessionLeft: 2400, tcActive: false, absActive: false };
+
+/* ---------- onglets ---------- */
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === "s-" + b.dataset.s));
+});
+
+/* ---------- dashboards ---------- */
+function drawThumb(cv, p, d, t) {
+  const c = cv.getContext("2d");
+  if (p.family === "custom") { const dsh = customs[p.id.slice(7)]; if (dsh) RSIMC.draw(c, JSON.parse(JSON.stringify(d)), dsh, 0, t); }
+  else if (RSIM.FAMILIES[p.family]) {
+    const dd = Object.assign({}, d);
+    if (p.family === "analog") { dd.maxRpm = (p.theme.tachMax || 8000) * 0.85; dd.rpm = dd.maxRpm * 0.8; dd.speed = 121; }
+    RSIM.FAMILIES[p.family](c, dd, p.theme, t);
+  }
+}
+function card(p) {
+  const cur = state.frame.connected && state.frame.profile === p.id;
+  const el = document.createElement("div"); el.className = "card" + (cur ? " cur" : "");
+  const cv = document.createElement("canvas"); cv.width = 1000; cv.height = 450; el.appendChild(cv);
+  thumbs.push([cv, p]);
+  const isC = p.family === "custom", dsh = isC ? customs[p.id.slice(7)] : null;
+  const info = document.createElement("div"); info.className = "info";
+  info.innerHTML = `<div class="name"><span>${p.name.replace(/^★ /, "")}</span><span class="tag ${isC ? "c" : ""}">${isC ? "perso" : p.family}</span></div>
+    <div class="sub">${isC ? (dsh.pages || []).length + " page(s)" + ((dsh.match || []).length ? " · voitures : " + dsh.match.join(", ") : "") : (p.match || []).length ? "voitures : " + p.match.slice(0, 4).join(", ") : "par défaut"}${cur ? " · <b style='color:var(--g)'>affiché</b>" : ""}</div>`;
+  const act = document.createElement("div"); act.className = "act";
+  const btn = (txt, cls, fn) => { const b = document.createElement("button"); b.textContent = txt; if (cls) b.className = cls; b.onclick = fn; act.appendChild(b); };
+  btn("Afficher sur le téléphone", "pri", async () => {
+    if (demo) await post("api/demo", { profile: p.id, maxRpm: 8000 }); else await post("api/action", { action: "dash:" + p.id });
+    toast("« " + p.name.replace(/^★ /, "") + " » envoyé au téléphone"); refresh();
+  });
+  btn("Mettre sur la voiture en cours", "", async () => {
+    const f = state.frame; if (!f.connected) return toast("Aucun jeu en cours");
+    await post("api/assign", { game: f.game, car: f.car, profile: p.id }); await post("api/action", { action: "dash_auto" });
+    toast("Attribué à " + f.car); refresh();
+  });
+  if (isC) {
+    btn("Éditer", "", () => location.href = "editor.html?id=" + encodeURIComponent(dsh.id));
+    btn("Dupliquer", "", async () => { const c = JSON.parse(JSON.stringify(dsh)); c.id = dsh.id + "_copie"; c.name = dsh.name + " (copie)";
+      await post("api/dashboard", c); toast("Copie créée"); load(); });
+    btn("Supprimer", "dan", async () => { if (!confirm("Supprimer « " + dsh.name + " » ?")) return; await post("api/dashboard/delete", { id: dsh.id }); load(); });
+  }
+  el.appendChild(info); info.appendChild(act); return el;
+}
+async function load() {
+  profiles = (await (await fetch("cars.json")).json()).profiles;
+  const list = await (await fetch("api/dashboards")).json();
+  customs = {};
+  await Promise.all(list.map(async x => customs[x.id] = await (await fetch("api/dashboard?id=" + encodeURIComponent(x.id))).json()));
+  render();
+}
+function render() {
+  thumbs = [];
+  const gc = $("gCustom"), gb = $("gBuilt"); gc.innerHTML = ""; gb.innerHTML = "";
+  const cs = profiles.filter(p => p.family === "custom");
+  if (!cs.length) gc.innerHTML = '<p style="color:var(--m)">Aucun dashboard perso pour l\'instant. Clique sur « Créer un dashboard ».</p>';
+  cs.forEach(p => gc.appendChild(card(p)));
+  profiles.filter(p => p.family !== "custom").forEach(p => gb.appendChild(card(p)));
+  renderSeen();
+}
+$("bNew").onclick = () => location.href = "editor.html?new=1";
+$("bAuto").onclick = async () => { await post("api/action", { action: "dash_auto" }); toast("Dashboard automatique selon la voiture"); };
+
+/* ---------- voitures ---------- */
+function renderSeen() {
+  const tb = $("seen"); tb.innerHTML = "";
+  if (!state.seen || !state.seen.length) { tb.innerHTML = '<tr><td colspan="4" style="color:var(--m)">Roule avec une voiture pour qu\'elle apparaisse ici.</td></tr>'; return; }
+  state.seen.forEach(s => {
+    const tr = document.createElement("tr"), key = s.game + "|" + s.car;
+    tr.innerHTML = `<td>${s.game}</td><td><code>${s.car}</code></td><td>${s.cls || ""}</td><td></td>`;
+    const sel = document.createElement("select");
+    sel.innerHTML = '<option value="">(automatique)</option>' + profiles.map(p => `<option value="${p.id}">${p.name}</option>`).join("");
+    sel.value = state.assign[key] || "";
+    sel.onchange = async () => { await post("api/assign", { game: s.game, car: s.car, profile: sel.value }); toast("Enregistré"); };
+    tr.lastChild.appendChild(sel); tb.appendChild(tr);
+  });
+}
+
+/* ---------- etat en direct ---------- */
+let seenSig = "";
+async function refresh() {
+  state = await (await fetch("api/state")).json(); demo = state.demo;
+  const f = state.frame;
+  $("live").innerHTML = f.connected
+    ? `<span class="dot on"></span><b>${f.game}</b> — ${f.car}<br>dash : ${(profiles.find(p => p.id === f.profile) || {}).name || f.profile} (${f.how})${f.page ? " · page " + (f.page + 1) : ""}`
+    : `<span class="dot"></span>Aucun jeu détecté${demo ? " (mode démo)" : ""}<br>Téléphone : ${state.phoneUrl || ""}`;
+  $("url").textContent = state.phoneUrl || location.host;
+  const sig = JSON.stringify([f.profile, (state.seen || []).length, state.assign]);
+  if (sig !== seenSig) { seenSig = sig; render(); }
+}
+async function binds() {
+  const j = await (await fetch("api/bindings")).json();
+  const names = { page_next: "Page suivante", page_prev: "Page précédente", dash_next: "Dashboard suivant", dash_prev: "Dashboard précédent", dash_auto: "Dashboard auto" };
+  $("bindList").innerHTML = j.binds.length ? "<table><tr><th>Périphérique</th><th>Bouton</th><th>Action</th></tr>" + j.binds.map(b =>
+    `<tr><td>#${b.dev} ${b.devName || ""}</td><td>${b.btn}</td><td>${(b.action || "").startsWith("key:") ? "Touche " + b.action.slice(4) : names[b.action] || b.action}</td></tr>`).join("") + "</table>"
+    : '<p style="color:var(--m)">Aucun bouton configuré.</p>';
+}
+let lastA = 0;
+function anim(ts) { if (ts - lastA > 150) { lastA = ts; const t = ts / 1000; thumbs.forEach(([cv, p]) => drawThumb(cv, p, sample, t)); } requestAnimationFrame(anim); }
+load().then(() => { refresh(); binds(); setInterval(refresh, 1500); requestAnimationFrame(anim); });
+</script>
+</body>
+</html>
