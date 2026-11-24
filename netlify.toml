@@ -1,3 +1,0 @@
-# Site RSIM sur Netlify : publie le dossier web tel quel (pas de build).
-[build]
-  publish = "web"
