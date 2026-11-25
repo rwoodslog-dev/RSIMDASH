@@ -1,3 +1,4 @@
+# Construit l'APK Android RSIM a chaque push (onglet Actions > dernier build > Artifacts > RSIM-apk).
 name: Build APK RSIM
 on:
   push:
@@ -26,6 +27,15 @@ jobs:
           M=android/app/src/main/AndroidManifest.xml
           sed -i 's/<application/<application android:usesCleartextTraffic="true"/' $M
           grep -q WAKE_LOCK $M || sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />#' $M
+      - name: Plein ecran (barres cachees + zone camera) + raccourcis Telecommande / Dash
+        run: |
+          cp MainActivity.java android/app/src/main/java/com/rsim33/rsim/MainActivity.java
+          mkdir -p android/app/src/main/res/xml && cp shortcuts.xml android/app/src/main/res/xml/shortcuts.xml
+          S=android/app/src/main/res/values/strings.xml
+          sed -i 's#</resources>#    <string name="sc_remote">Télécommande</string>\n    <string name="sc_remote_long">RSIM Télécommande PC</string>\n    <string name="sc_dash">Dash</string>\n</resources>#' $S
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i '0,/<\/activity>/s##            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />\n        </activity>#' $M
+          grep -n "shortcuts" $M
       - name: Icones
         run: npx capacitor-assets generate --android || echo "icones par defaut"
       - name: Synchroniser
