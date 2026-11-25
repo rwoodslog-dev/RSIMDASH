@@ -66,7 +66,7 @@ class State:
         self.load_dashes()
         self.ring = recorder.Ring(300)                                   # 5 min de telemetrie pour les videos
         self.laps = recorder.LapRecorder(os.path.join(BASE, "telemetry"))
-        self.ffb = ffb.FFBStore(os.path.join(BASE, "ffb_profiles.json"))
+        self.ffb = ffb.FFBStore(os.path.join(BASE, "ffb_profiles.json"), steam_dirs=steam_dirs_by_game)
         self.cap = None
         self.hk = None
         # dash en direct : page 1 = dash principal ("auto" = selon jeu + voiture, sinon dash choisi et bloque) + pages ajoutees
@@ -194,6 +194,10 @@ class State:
         print("  > action :", act)
         return True
 
+    def devices(self):
+        j = getattr(self, "joy", None)
+        return list(j.devices) if j else []
+
     def apply_hotkeys(self):
         if self.hk and self.cap:
             c = self.cap.cfg
@@ -277,7 +281,11 @@ class State:
         if self.cap:
             r = self.cap.small()
             d["rec"], d["recOn"], d["bufOn"] = r, int(r["on"]), int(r["buf"])
-        fp = self.ffb.match(d["game"], d["car"], d["carClass"])
+        devs = self.devices()
+        fp = self.ffb.match(d["game"], d["car"], d["carClass"], self.ffb.wheel(devs)[0])
+        if now - self.ffb.last_scan > 10:          # enregistrement auto des reglages FFB (fichiers du jeu / Pit House)
+            self.ffb.last_scan = now
+            threading.Thread(target=self.ffb.autocapture, args=(d["game"], devs, True), daemon=True).start()
         d["ffbProfile"] = fp["name"] if fp else None
         with self.lock:
             self.frame = d
@@ -409,10 +417,10 @@ def make_handler(st):
                 return self.send(200 if lap else 404, lap or {"error": "introuvable"})
             # ---- profils FFB
             if p == "/api/ffb":
-                return self.send(200, dict(st.ffb.meta(), profiles=st.ffb.profiles))
+                return self.send(200, dict(st.ffb.meta(st.devices()), profiles=st.ffb.profiles))
             if p == "/api/ffb/current":
                 f = st.frame
-                m = st.ffb.match(f.get("game"), f.get("car"), f.get("carClass", "")) if f.get("connected") else None
+                m = st.ffb.match(f.get("game"), f.get("car"), f.get("carClass", ""), st.ffb.wheel(st.devices())[0]) if f.get("connected") else None
                 return self.send(200, {"profile": m, "game": f.get("game"), "car": f.get("car")})
             # ---- videos
             if p == "/api/capture":
@@ -478,6 +486,14 @@ def make_handler(st):
                 return self.send(200, {"ok": True, "s": st.laps.import_lap(data.get("lap"), data.get("owner"))})
             if p == "/api/ffb":
                 return self.send(200, {"ok": True, "id": st.ffb.put(data)})
+            if p == "/api/ffb/wheel":
+                st.ffb.wheel_override = data if data.get("brand") else None
+                st.ffb.save()
+                return self.send(200, {"ok": True})
+            if p == "/api/ffb/scan":
+                f = st.frame
+                r = st.ffb.autocapture(f.get("game") or data.get("game"), st.devices(), force=True)
+                return self.send(200, {"ok": True, "profile": r, "status": st.ffb.status})
             if p == "/api/ffb/delete":
                 st.ffb.delete(data.get("id"))
                 return self.send(200, {"ok": True})
@@ -658,6 +674,20 @@ def launchers():
         out = [x for x in extra if isinstance(x, dict) and x.get("id") and x.get("path")] + out
     _LAUNCH_CACHE.update(t=time.time(), list=out)
     return out
+
+
+def steam_dirs_by_game():
+    """{jeu: [dossiers d'installation Steam]} pour retrouver les fichiers de reglages (LMU, AC Rally...)."""
+    if time.time() - _STEAM_DIRS["t"] < 300:
+        return _STEAM_DIRS["d"]
+    out = {}
+    for aid, name, d in steam_games():
+        out.setdefault(ffb.game_key(name), []).append(d)
+    _STEAM_DIRS.update(t=time.time(), d=out)
+    return out
+
+
+_STEAM_DIRS = {"t": 0, "d": {}}
 
 
 def open_on_pc(what):
