@@ -57,8 +57,8 @@
 "use strict";
 const $ = id => document.getElementById(id);
 if (RSIMAPI.needsSetup) location.href = "settings.html?first=1";
-else if (localStorage.getItem("rsimStart") === "live" && !sessionStorage.getItem("rsimHomeSeen") && !location.search.includes("home")) {
-  sessionStorage.setItem("rsimHomeSeen", "1"); location.href = "live.html";
+else if (["live", "remote"].includes(localStorage.getItem("rsimStart")) && !sessionStorage.getItem("rsimHomeSeen") && !location.search.includes("home")) {
+  sessionStorage.setItem("rsimHomeSeen", "1"); location.href = localStorage.getItem("rsimStart") === "remote" ? "remote.html" : "live.html";
 }
 sessionStorage.setItem("rsimHomeSeen", "1");
 async function poll() {
