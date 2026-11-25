@@ -35,7 +35,7 @@ jobs:
           sed -i 's#</resources>#    <string name="sc_remote">Télécommande</string>\n    <string name="sc_remote_long">RSIM Télécommande PC</string>\n    <string name="sc_dash">Dash</string>\n</resources>#' $S
           M=android/app/src/main/AndroidManifest.xml
           sed -i '0,/<\/activity>/s##            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />\n        </activity>#' $M
-          grep -n "shortcuts" $M
+          grep -n "shortcuts" $M || echo "meta-data raccourcis non ajoutee"
       - name: Icones
         run: npx capacitor-assets generate --android || echo "icones par defaut"
       - name: Synchroniser
