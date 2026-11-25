@@ -1,0 +1,12 @@
+{
+ "fps": 120,
+ "bitrate": 40,
+ "pipeline": "auto",
+ "monitor": 0,
+ "audio": "Microphone (2- fifine Microphone)",
+ "bufferSec": 60,
+ "autoBuffer": false,
+ "hotRec": "CTRL+ALT+R",
+ "hotClip": "CTRL+ALT+C",
+ "hotBuf": "CTRL+ALT+B"
+}

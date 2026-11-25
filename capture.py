@@ -18,7 +18,7 @@ import time
 WIN = sys.platform == "win32"
 NOWIN = 0x08000000 if WIN else 0        # CREATE_NO_WINDOW
 
-DEFAULT = {"fps": 60, "bitrate": 40, "pipeline": "auto", "monitor": 0, "audio": "", "bufferSec": 60,
+DEFAULT = {"hotSnap": "CTRL+ALT+P", "fps": 144, "vfr": True, "bitrate": 40, "pipeline": "auto", "monitor": 0, "audio": "", "bufferSec": 60,
            "autoBuffer": False, "hotRec": "CTRL+ALT+R", "hotClip": "CTRL+ALT+C", "hotBuf": "CTRL+ALT+B"}
 
 PIPES = [  # id, libelle, source, encodeur
@@ -45,6 +45,9 @@ class Capture:
         self.on_event = on_event or (lambda kind, info: None)
         self.folder = os.path.join(base, "videos")
         self.tmp = os.path.join(self.folder, ".buffer")
+        self.photos = os.path.join(base, "photos")
+        os.makedirs(self.photos, exist_ok=True)
+        self.last_snap_at = 0
         os.makedirs(self.tmp, exist_ok=True)
         self.cfg_path = os.path.join(base, "capture.json")
         self.cfg = dict(DEFAULT)
@@ -82,6 +85,62 @@ class Capture:
             if os.path.isfile(p):
                 return p
         return shutil.which("ffmpeg")
+
+    # ------------------------------------------------------------ installation automatique de ffmpeg (Windows)
+    FF_URLS = ["https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip",
+               "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"]
+
+    def install_ffmpeg(self):
+        if getattr(self, "installing", None) or self.ffmpeg:
+            return False
+        self.installing = {"pct": 0, "msg": "Téléchargement…"}
+        threading.Thread(target=self._install, daemon=True).start()
+        return True
+
+    def _install(self):
+        import urllib.request
+        import zipfile
+        tmp = os.path.join(self.base, "ffmpeg_download.zip")
+        try:
+            last = None
+            for url in self.FF_URLS:
+                try:
+                    self.installing["msg"] = "Téléchargement de ffmpeg (~100 Mo)…"
+                    req = urllib.request.Request(url, headers={"User-Agent": "RSIM"})
+                    with urllib.request.urlopen(req, timeout=30) as r, open(tmp, "wb") as f:
+                        total = int(r.headers.get("Content-Length") or 0)
+                        done = 0
+                        while True:
+                            chunk = r.read(1 << 20)
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                            done += len(chunk)
+                            self.installing["pct"] = round(done * 100.0 / total) if total else 0
+                    last = None
+                    break
+                except Exception as e:
+                    last = e
+            if last:
+                raise last
+            self.installing["msg"] = "Extraction…"
+            with zipfile.ZipFile(tmp) as z:
+                name = next(n for n in z.namelist() if n.lower().endswith("/bin/ffmpeg.exe"))
+                with z.open(name) as src, open(os.path.join(self.base, "ffmpeg.exe"), "wb") as dst:
+                    shutil.copyfileobj(src, dst)
+            self.ffmpeg = self.find_ffmpeg()
+            self.error = ""
+            self.installing = None
+            print("  > ffmpeg installe :", self.ffmpeg)
+            self._boot()
+        except Exception as e:
+            self.installing = None
+            self.error = "Installation de ffmpeg impossible (%s). Fais-le à la main : gyan.dev → ffmpeg-release-essentials.zip → bin\\ffmpeg.exe à côté de server.py." % e
+        finally:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
 
     def save_cfg(self, new):
         for k, v in (new or {}).items():
@@ -159,12 +218,14 @@ class Capture:
         return ok[0] if ok else ("gdi_x264" if WIN else "test_x264")
 
     # ------------------------------------------------------------ construction de la commande
-    def video_in(self, src, fps):
+    def video_in(self, src, fps, vfr=False):
         mon = int(self.cfg.get("monitor", 0))
+        # vfr : une image seulement quand l'ecran change -> la video suit les FPS du jeu (plafond = fps)
+        dup = ":dup_frames=0" if vfr else ""
         if src == "dda":
-            return ["-f", "lavfi", "-i", "ddagrab=output_idx=%d:framerate=%d:draw_mouse=0" % (mon, fps)]
+            return ["-f", "lavfi", "-i", "ddagrab=output_idx=%d:framerate=%d:draw_mouse=0%s" % (mon, fps, dup)]
         if src == "ddadl":
-            return ["-f", "lavfi", "-i", "ddagrab=output_idx=%d:framerate=%d:draw_mouse=0,hwdownload,format=bgra" % (mon, fps)]
+            return ["-f", "lavfi", "-i", "ddagrab=output_idx=%d:framerate=%d:draw_mouse=0%s,hwdownload,format=bgra" % (mon, fps, dup)]
         if src == "gdi":
             return ["-f", "gdigrab", "-framerate", str(fps), "-draw_mouse", "0", "-i", "desktop"]
         return ["-re", "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=%d" % fps]
@@ -172,11 +233,11 @@ class Capture:
     def encoder(self, enc, fps, mbps):
         br, buf = "%dM" % mbps, "%dM" % (mbps * 2)
         g = ["-g", str(fps * 2), "-force_key_frames", "expr:gte(t,n_forced*2)"]
-        if enc == "amf":
-            return ["-c:v", "h264_amf", "-usage", "transcoding", "-quality", "quality", "-rc", "cbr",
-                    "-b:v", br, "-maxrate", br, "-bufsize", buf] + g
+        if enc == "amf":   # "balanced" : la qualite "quality" est trop lente a 60+ i/s et fait saccader
+            return ["-c:v", "h264_amf", "-usage", "transcoding", "-quality", "balanced", "-rc", "vbr_peak",
+                    "-b:v", br, "-maxrate", "%dM" % int(mbps * 1.5), "-bufsize", buf, "-bf", "0"] + g
         if enc == "nvenc":
-            return ["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "cbr", "-b:v", br, "-maxrate", br, "-bufsize", buf] + g
+            return ["-c:v", "h264_nvenc", "-preset", "p3", "-rc", "cbr", "-b:v", br, "-maxrate", br, "-bufsize", buf] + g
         if enc == "qsv":
             return ["-c:v", "h264_qsv", "-preset", "faster", "-b:v", br, "-maxrate", br] + g
         return ["-c:v", "libx264", "-preset", "veryfast", "-b:v", br, "-maxrate", br, "-bufsize", buf, "-pix_fmt", "yuv420p"] + g
@@ -185,19 +246,23 @@ class Capture:
         pid = self.pipeline()
         _, _, src, enc = next(p for p in PIPES if p[0] == pid)
         fps, mbps = int(self.cfg["fps"]), int(self.cfg["bitrate"])
-        args = ["-y", "-loglevel", "error", "-stats", "-stats_period", "0.5"] + self.video_in(src, fps)
+        vfr = bool(self.cfg.get("vfr")) and src in ("dda", "ddadl")
+        args = ["-y", "-loglevel", "error", "-stats", "-stats_period", "0.5", "-thread_queue_size", "1024"] + self.video_in(src, fps, vfr)
         audio = self.cfg.get("audio") if WIN else ""
         if audio:
             args += ["-f", "dshow", "-audio_buffer_size", "50", "-i", "audio=" + audio, "-map", "0:v", "-map", "1:a",
                      "-c:a", "aac", "-b:a", "192k"]
         if src == "ddadl" and enc in ("amf", "qsv"):
             args += ["-pix_fmt", "nv12"]
+        if vfr:
+            args += ["-fps_mode", "passthrough"]
         return [self.ffmpeg] + args + self.encoder(enc, fps, mbps) + out_args, pid
 
     def spawn(self, cmd, state):
         self.log, self.error = [], ""
         print("  > ffmpeg :", " ".join('"%s"' % a if " " in a else a for a in cmd))
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, creationflags=NOWIN)
+        prio = 0x00000080 if WIN else 0     # HIGH_PRIORITY_CLASS : la capture ne doit pas manquer d'images
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, creationflags=NOWIN | prio)
         state.update(proc=proc, spawned=time.time(), t0=None)
         threading.Thread(target=self.read_err, args=(proc, state), daemon=True).start()
         return proc
@@ -218,8 +283,13 @@ class Capture:
                 m = re.search(r"frame=\s*(\d+)", line)
                 if m:
                     n = int(m.group(1))
+                    tm = re.search(r"time=\s*(\d+):(\d+):([\d.]+)", line)
                     if n > 0 and state.get("t0") is None:
-                        state["t0"] = time.time() - n / float(fps)
+                        el = int(tm.group(1)) * 3600 + int(tm.group(2)) * 60 + float(tm.group(3)) if tm else n / float(fps)
+                        state["t0"] = time.time() - el
+                    fm = re.search(r"fps=\s*([\d.]+)", line)
+                    if fm:
+                        state["fpsNow"] = float(fm.group(1))
                 else:
                     self.log = (self.log + [line])[-30:]
             else:
@@ -396,10 +466,106 @@ class Capture:
         self.last_file = os.path.basename(path)
         print("  > Video enregistree : %s (%d s, %d points de telemetrie)" % (self.last_file, t1 - t0, len(tele)))
 
+    # ------------------------------------------------------------ photos (capture d'ecran)
+    def snap(self):
+        """Photo de l'ecran (pleine resolution) + telemetrie du moment."""
+        if not self.ffmpeg:
+            self.error = "ffmpeg introuvable : impossible de prendre une photo."
+            return False
+        pid = self.pipeline()
+        src = next(p for p in PIPES if p[0] == pid)[2]
+        mon = int(self.cfg.get("monitor", 0))
+        if src in ("dda", "ddadl"):
+            vin = ["-f", "lavfi", "-i", "ddagrab=output_idx=%d:framerate=30:draw_mouse=0,hwdownload,format=bgra" % mon]
+        elif src == "gdi":
+            vin = ["-f", "gdigrab", "-draw_mouse", "0", "-i", "desktop"]
+        else:
+            vin = ["-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=1"]
+        m = self.meta()
+        name = time.strftime("%Y-%m-%d_%H-%M-%S") + "_" + slug(m["car"] or m["game"] or "photo")
+        out = os.path.join(self.photos, name + ".png")
+        code, err = self.run(["-y", "-loglevel", "error"] + vin + ["-frames:v", "1", out], 20)
+        if code != 0 or not os.path.isfile(out):
+            self.error = "Photo : " + err.strip()[-200:]
+            return False
+        f = self.get_frame() or {}
+        self.photo_meta(out, dict(m, kind="screen", tele={k: f.get(k) for k in ("speed", "gear", "rpm", "lap", "pos", "cur", "best", "delta")}))
+        self.last_snap_at = time.time()
+        print("  > Photo :", os.path.basename(out))
+        self.on_event("snap", {"file": os.path.basename(out)})
+        return True
+
+    def photo_meta(self, path, meta):
+        meta = dict(meta, file=os.path.basename(path), at=int(time.time()))
+        with open(os.path.splitext(path)[0] + ".json", "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False)
+        # miniature
+        self.run(["-y", "-loglevel", "error", "-i", path, "-vf", "scale=480:-2", os.path.splitext(path)[0] + ".thumb.jpg"], 20)
+
+    def photo_save(self, name, data_url, meta):
+        """Photo envoyee par l'appli (image tiree d'une video, photo retouchee, import)."""
+        import base64
+        m = re.match(r"^data:image/(png|jpeg|webp);base64,(.+)$", data_url or "", re.S)
+        if not m:
+            return None
+        ext = {"png": ".png", "jpeg": ".jpg", "webp": ".webp"}[m.group(1)]
+        base = slug(os.path.splitext(name or "photo")[0])
+        out = os.path.join(self.photos, time.strftime("%Y-%m-%d_%H-%M-%S") + "_" + base + ext)
+        with open(out, "wb") as f:
+            f.write(base64.b64decode(m.group(2)))
+        self.photo_meta(out, meta or {})
+        return os.path.basename(out)
+
+    def photo_list(self):
+        out = []
+        for p in sorted(glob.glob(os.path.join(self.photos, "*.*")), reverse=True):
+            if p.endswith((".json", ".thumb.jpg")):
+                continue
+            base = os.path.splitext(p)[0]
+            info = {}
+            try:
+                with open(base + ".json", encoding="utf-8") as f:
+                    info = json.load(f)
+            except Exception:
+                pass
+            info.update(file=os.path.basename(p), size=os.path.getsize(p), mtime=int(os.path.getmtime(p)),
+                        thumb=os.path.basename(base + ".thumb.jpg") if os.path.isfile(base + ".thumb.jpg") else None)
+            out.append(info)
+        return out
+
+    def photo_path(self, name):
+        name = os.path.basename(name or "")
+        return os.path.join(self.photos, name) if re.match(r"^[\w.\-]+$", name) else None
+
+    def photo_delete(self, name):
+        p = self.photo_path(name)
+        if not p:
+            return False
+        base = os.path.splitext(p)[0]
+        for f in (p, base + ".json", base + ".thumb.jpg"):
+            try:
+                os.remove(f)
+            except OSError:
+                pass
+        return True
+
+    def video_save(self, name, data):
+        """Montage ou export envoye par l'appli."""
+        nm = slug(os.path.splitext(name or "montage")[0])
+        ext = ".mp4" if (name or "").lower().endswith(".mp4") else ".webm"
+        out = os.path.join(self.folder, time.strftime("%Y-%m-%d_%H-%M-%S") + "_" + nm + ext)
+        with open(out, "wb") as f:
+            f.write(data)
+        with open(os.path.splitext(out)[0] + ".json", "w", encoding="utf-8") as f:
+            json.dump({"kind": "montage", "start": int(time.time()), "car": nm, "tele": []}, f)
+        if ext == ".mp4":
+            self.run(["-y", "-loglevel", "error", "-ss", "1", "-i", out, "-frames:v", "1", "-vf", "scale=480:-2", os.path.splitext(out)[0] + ".jpg"], 30)
+        return os.path.basename(out)
+
     # ------------------------------------------------------------ bibliotheque
     def list(self):
         out = []
-        for p in sorted(glob.glob(os.path.join(self.folder, "*.mp4")), reverse=True):
+        for p in sorted(glob.glob(os.path.join(self.folder, "*.mp4")) + glob.glob(os.path.join(self.folder, "*.webm")), key=os.path.getmtime, reverse=True):
             base = os.path.splitext(p)[0]
             info = {}
             try:
@@ -423,7 +589,7 @@ class Capture:
         p = self.safe(name)
         if not p or (self.rec and self.rec["path"] == p):
             return False
-        for ext in (".mp4", ".json", ".jpg"):
+        for ext in (".mp4", ".webm", ".json", ".jpg"):
             try:
                 os.remove(os.path.splitext(p)[0] + ext)
             except OSError:
@@ -447,13 +613,15 @@ class Capture:
 
     def status(self):
         rec, buf = self.rec, self.buf
-        return {"ffmpeg": self.ffmpeg, "recording": bool(rec), "recFor": round(time.time() - rec["spawned"], 1) if rec else 0,
+        cur = rec or buf or {}
+        return {"fpsNow": cur.get("fpsNow"), "ffmpeg": self.ffmpeg, "installing": getattr(self, "installing", None), "recording": bool(rec), "recFor": round(time.time() - rec["spawned"], 1) if rec else 0,
                 "buffering": bool(buf), "bufferSec": self.cfg["bufferSec"], "lastFile": self.last_file, "error": self.error,
                 "lastClipAt": self.last_clip_at, "cfg": self.cfg, "log": self.log[-8:],
                 "pipes": [{"id": p[0], "label": p[1]} for p in PIPES if (p[2] == "test") != WIN], "probe": self.probe_cache}
 
     def small(self):
-        return {"on": bool(self.rec), "buf": bool(self.buf), "clipAt": self.last_clip_at,
+        st = self.rec or self.buf or {}
+        return {"snapAt": self.last_snap_at, "on": bool(self.rec), "buf": bool(self.buf), "fps": st.get("fpsNow"), "clipAt": self.last_clip_at,
                 "t": round(time.time() - self.rec["spawned"]) if self.rec else 0}
 
     def shutdown(self):

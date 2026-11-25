@@ -3,6 +3,7 @@
 Telephone : http://<IP du PC>:8888        Page admin (sur le PC) : http://localhost:8888/admin
 """
 import argparse
+import glob
 import json
 import os
 import socket
@@ -25,6 +26,7 @@ WEB = os.path.join(BASE, "web")
 CARS = os.path.join(BASE, "cars.json")
 ASSIGN = os.path.join(BASE, "assignments.json")
 SEEN = os.path.join(BASE, "seen_cars.json")
+LIVE_PATH = os.path.join(BASE, "live_pages.json")
 DASH_DIR = os.path.join(BASE, "dashboards")
 BB_DIR = os.path.join(BASE, "buttonboxes")      # button box fournies (modeles d'origine)
 BINDS = os.path.join(BASE, "bindings.json")
@@ -67,6 +69,8 @@ class State:
         self.ffb = ffb.FFBStore(os.path.join(BASE, "ffb_profiles.json"))
         self.cap = None
         self.hk = None
+        # dash en direct : page 1 = dash principal ("auto" = selon jeu + voiture, sinon dash choisi et bloque) + pages ajoutees
+        self.live = load_json(LIVE_PATH, None) or {"main": "auto", "pages": []}
 
     # ---- dashboards personnalises (dossier dashboards/)
     def load_dashes(self):
@@ -78,7 +82,7 @@ class State:
             for fn in sorted(os.listdir(folder)):
                 if fn.endswith(".json"):
                     dsh = load_json(os.path.join(folder, fn), None)
-                    if dsh and dsh.get("id"):
+                    if dsh and dsh.get("id") and not (folder == BB_DIR and dsh["id"] in OLD_BB):
                         self.dashes[dsh["id"]] = dsh
 
     def save_dash(self, dsh):
@@ -103,7 +107,42 @@ class State:
                          "aspect": "16:9" if dsh.get("w") == 1600 else None, "games": [], "match": dsh.get("match", [])})
         return prof
 
+    # ---- dash en direct (pages)
+    def name_of(self, ref):
+        if ref == "auto":
+            return "Dash auto"
+        p = next((x for x in self.all_profiles() if x["id"] == ref), None)
+        return re.sub(r"^[★🎛▤] ", "", p["name"]) if p else ref
+
+    def expand(self, ref):
+        """Un ecran multi-pages ajoute toutes ses pages."""
+        if ref and ref[7:] in OLD_BB:
+            ref = "custom:" + OLD_BB[ref[7:]]
+        if ref and ref.startswith("custom:"):
+            dsh = self.dashes.get(ref[7:])
+            if dsh and dsh.get("type") == "multi":
+                return [{"ref": pg.get("ref") or "auto", "name": pg.get("name") or self.name_of(pg.get("ref") or "auto")} for pg in dsh.get("pages", [])]
+        return [{"ref": ref, "name": self.name_of(ref)}]
+
+    def live_dash(self):
+        pages = []
+        for ref in [self.live.get("main") or "auto"] + list(self.live.get("pages", [])):
+            pages += self.expand(ref)
+        return {"id": "__live", "name": "Dash en direct", "type": "multi", "w": 1600, "h": 900, "pages": pages,
+                "main": self.live.get("main") or "auto", "extra": list(self.live.get("pages", []))}
+
+    def set_live(self, main=None, pages=None):
+        if main is not None:
+            self.live["main"] = main or "auto"
+        if pages is not None:
+            self.live["pages"] = [p for p in pages if p and p != "custom:__live"][:20]
+        save_json(LIVE_PATH, self.live)
+        self.ui["page"] = min(self.ui["page"], len(self.live_dash()["pages"]) - 1)
+        self.dash_rev += 1
+
     def pages_of(self, profile):
+        if profile == "custom:__live":
+            return max(1, len(self.live_dash()["pages"]))
         if profile and profile.startswith("custom:"):
             dsh = self.dashes.get(profile[7:])
             return max(1, len(dsh.get("pages", []))) if dsh else 1
@@ -112,24 +151,38 @@ class State:
     # ---- actions (boutons du volant / boutons du telephone)
     def action(self, act):
         act = (act or "").strip()
-        cur = self.frame.get("profile") if self.frame.get("connected") else (self.ui["override"] or self.ui["lastProfile"])
+        cur = "custom:__live"
         ids = [x["id"] for x in self.all_profiles()]
         if act == "page_next":
             self.ui["page"] = (self.ui["page"] + 1) % self.pages_of(cur)
         elif act == "page_prev":
             self.ui["page"] = (self.ui["page"] - 1) % self.pages_of(cur)
-        elif act in ("dash_next", "dash_prev") and ids:
-            i = ids.index(cur) if cur in ids else 0
-            self.ui["override"] = ids[(i + (1 if act == "dash_next" else -1)) % len(ids)]
+        elif act in ("dash_next", "dash_prev") and ids:      # change le dash principal (et le bloque)
+            m = self.live.get("main")
+            if m == "auto":
+                m = self.ui.get("lastAuto")
+            i = ids.index(m) if m in ids else 0
+            self.set_live(main=ids[(i + (1 if act == "dash_next" else -1)) % len(ids)])
             self.ui["page"] = 0
         elif act == "dash_auto":
-            self.ui["override"], self.ui["page"] = None, 0
-        elif act.startswith("dash:"):
-            self.ui["override"], self.ui["page"] = act[5:], 0
+            self.set_live(main="auto")
+            self.ui["page"] = 0
+        elif act.startswith("dash:"):                         # dash choisi = page 1 bloquee
+            self.set_live(main=act[5:])
+            self.ui["page"] = 0
+        elif act.startswith("live_add:"):                     # ajoute une page a la suite
+            self.set_live(pages=self.live.get("pages", []) + [act[9:]])
+            self.ui["page"] = self.pages_of(cur) - 1
         elif act.startswith("page:"):
             self.ui["page"] = max(0, int(act[5:]) - 1) % self.pages_of(cur)
-        elif act in ("rec_toggle", "rec_start", "rec_stop", "clip", "buffer_toggle") and self.cap:
+        elif act in ("rec_toggle", "rec_start", "rec_stop", "clip", "buffer_toggle", "snap") and self.cap:
             threading.Thread(target=getattr(self.cap, act), daemon=True).start()   # ne bloque pas le bouton
+        elif act.startswith("launch:"):
+            threading.Thread(target=launch, args=(act[7:],), daemon=True).start()
+        elif act.startswith("openpc:"):
+            open_on_pc(act[7:])
+        elif act.startswith("media:"):
+            inputs.media_key(act[6:])
         elif act.startswith("key:"):
             inputs.send_keys(act[4:])
         elif act.startswith("keydown:"):
@@ -144,7 +197,7 @@ class State:
     def apply_hotkeys(self):
         if self.hk and self.cap:
             c = self.cap.cfg
-            self.hk.set({"rec_toggle": c.get("hotRec"), "clip": c.get("hotClip"), "buffer_toggle": c.get("hotBuf")})
+            self.hk.set({"rec_toggle": c.get("hotRec"), "clip": c.get("hotClip"), "buffer_toggle": c.get("hotBuf"), "snap": c.get("hotSnap")})
 
     def on_button(self, dev, btn):
         for b in self.binds:
@@ -200,19 +253,18 @@ class State:
     def publish(self, d):
         if d is None:   # pas de jeu : on garde le dernier dash affiche (le telephone le montre en attente)
             with self.lock:
-                self.frame = {"connected": False, "profile": self.ui["override"] or self.ui["lastProfile"], "page": self.ui["page"],
+                self.frame = {"connected": False, "profile": "custom:__live", "page": self.ui["page"], "liveMain": self.live.get("main"),
                               "dashRev": self.dash_rev, "autoProfile": self.ui.get("lastAuto")}
                 if self.cap:
                     r = self.cap.small()
                     self.frame.update(rec=r, recOn=int(r["on"]), bufOn=int(r["buf"]))
             self.laps.idle()
             return
-        prof, how = self.resolve(d["game"], d["car"], d["carClass"])
-        d["autoProfile"] = self.ui["lastAuto"] = self.resolve(d["game"], d["car"], d["carClass"], no_multi=True)[0]
-        if self.ui["override"]:
-            prof, how = self.ui["override"], "bouton"
-        if prof != self.ui["lastProfile"]:
-            self.ui["page"], self.ui["lastProfile"] = 0, prof
+        auto, how_auto = self.resolve(d["game"], d["car"], d["carClass"], no_multi=True)
+        d["autoProfile"] = self.ui["lastAuto"] = auto
+        main = self.live.get("main") or "auto"
+        prof, how = "custom:__live", ("auto · " + how_auto if main == "auto" else "bloqué")
+        d["liveMain"] = main
         d["fuelPerLap"] = self.fuel_avg(d)
         d["fuelLaps"] = d["fuel"] / d["fuelPerLap"] if d["fuelPerLap"] > 0 else None
         now = time.time()
@@ -268,7 +320,7 @@ def source_loop(st):
 
 MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
         ".css": "text/css", ".json": "application/json", ".png": "image/png", ".svg": "image/svg+xml",
-        ".woff2": "font/woff2", ".mp4": "video/mp4", ".jpg": "image/jpeg", ".webmanifest": "application/manifest+json"}
+        ".woff2": "font/woff2", ".mp4": "video/mp4", ".webm": "video/webm", ".jpg": "image/jpeg", ".webp": "image/webp", ".webmanifest": "application/manifest+json"}
 
 
 def make_handler(st):
@@ -325,7 +377,11 @@ def make_handler(st):
                 return self.static("buttons.html")
             if p == "/api/dashboards":
                 return self.send(200, [{"id": k, "name": v.get("name", k), "pages": len(v.get("pages", []))} for k, v in st.dashes.items()])
+            if p == "/api/live":
+                return self.send(200, st.live_dash())
             if p == "/api/dashboard":
+                if (q.get("id") or [""])[0] == "__live":
+                    return self.send(200, st.live_dash())
                 dsh = st.dashes.get((q.get("id") or [""])[0])
                 return self.send(200 if dsh else 404, dsh or {"error": "introuvable"})
             if p == "/api/joy":
@@ -375,10 +431,20 @@ def make_handler(st):
                 return self.send(200, load_json(j, {})) if j and os.path.isfile(j) else self.send(404, {"error": "?"})
             if p.startswith("/media/"):
                 return self.media(p[7:], "dl" in q)
+            if p.startswith("/photo/"):
+                return self.media(p[7:], "dl" in q, photo=True)
+            if p == "/api/launchers":
+                return self.send(200, [{"id": x["id"], "name": x["name"], "sim": x.get("sim", True)} for x in launchers()])
+            if p == "/api/photos":
+                return self.send(200, st.cap.photo_list())
             return self.static(p.lstrip("/"))
 
         def do_POST(self):
             n = int(self.headers.get("Content-Length") or 0)
+            u = urlparse(self.path)
+            if u.path == "/api/video/upload":          # montage envoye par l'appli (donnees brutes)
+                name = (parse_qs(u.query).get("name") or ["montage.webm"])[0]
+                return self.send(200, {"ok": True, "file": st.cap.video_save(name, self.rfile.read(n))})
             try:
                 data = json.loads(self.rfile.read(n) or b"{}")
             except Exception:
@@ -394,6 +460,9 @@ def make_handler(st):
                 return self.send(200, {"ok": True})
             if p == "/api/dashboard":
                 return self.send(200, {"ok": True, "id": st.save_dash(data)})
+            if p == "/api/live":
+                st.set_live(data.get("main"), data.get("pages"))
+                return self.send(200, st.live_dash())
             if p == "/api/dashboard/delete":
                 st.delete_dash(data.get("id", ""))
                 return self.send(200, {"ok": True})
@@ -412,10 +481,35 @@ def make_handler(st):
             if p == "/api/ffb/delete":
                 st.ffb.delete(data.get("id"))
                 return self.send(200, {"ok": True})
+            if p == "/api/capture/install":
+                return self.send(200, {"ok": st.cap.install_ffmpeg()})
             if p == "/api/capture/config":
                 st.cap.save_cfg(data)
                 st.apply_hotkeys()
                 return self.send(200, st.cap.status())
+            if p == "/api/input":          # telecommande : souris / texte
+                t = data.get("t")
+                try:
+                    if t == "move":
+                        inputs.mouse_move(data.get("dx", 0), data.get("dy", 0))
+                    elif t == "btn":
+                        inputs.mouse_button(data.get("b", "left"), bool(data.get("down")))
+                    elif t == "click":
+                        inputs.mouse_click(data.get("b", "left"), bool(data.get("double")))
+                    elif t == "wheel":
+                        inputs.mouse_wheel(data.get("d", 0), bool(data.get("h")))
+                    elif t == "bs":
+                        for _ in range(min(200, int(data.get("n", 1)))):
+                            inputs.key_state("BACKSPACE", False); inputs.key_state("BACKSPACE", True)
+                    elif t == "text":
+                        inputs.type_text(str(data.get("s", ""))[:2000])
+                except Exception as e:
+                    return self.send(200, {"ok": False, "error": str(e)})
+                return self.send(200, {"ok": True})
+            if p == "/api/photo/upload":
+                return self.send(200, {"ok": True, "file": st.cap.photo_save(data.get("name"), data.get("data"), data.get("meta"))})
+            if p == "/api/photo/delete":
+                return self.send(200, {"ok": st.cap.photo_delete(data.get("f"))})
             if p == "/api/video/delete":
                 return self.send(200, {"ok": st.cap.delete(data.get("f"))})
             if p == "/api/video/offset":
@@ -433,9 +527,9 @@ def make_handler(st):
                 return self.send(200, {"ok": True})
             return self.send(404, {"error": "?"})
 
-        def media(self, name, download=False):
+        def media(self, name, download=False, photo=False):
             from urllib.parse import unquote
-            path = st.cap.safe(unquote(name))
+            path = (st.cap.photo_path if photo else st.cap.safe)(unquote(name))
             if not path or not os.path.isfile(path):
                 return self.send(404, {"error": "introuvable"})
             size = os.path.getsize(path)
@@ -492,6 +586,107 @@ def make_handler(st):
     return H
 
 
+# jeux lancables depuis le stream deck : tous tes jeux Steam installes (detectes) + Content Manager
+# + tes applis dans launchers.json : [{"id":"obs","name":"OBS","path":"C:/.../obs64.exe"}]
+SIM_WORDS = ("assetto", "mans", "automobilista", "raceroom", "rally", "rfactor", "iracing", "beamng", "f1", "dirt", "wrc", "forza",
+             "gran", "project cars", "kart", "race", "racing", "drift")
+_LAUNCH_CACHE = {"t": 0, "list": []}
+
+
+def steam_games():
+    """Lit les bibliotheques Steam du PC (appmanifest_*.acf) -> [(appid, nom, dossier)]."""
+    if sys.platform != "win32":
+        return []
+    try:
+        import winreg
+        k = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam")
+        steam = winreg.QueryValueEx(k, "SteamPath")[0]
+    except Exception:
+        steam = r"C:\Program Files (x86)\Steam"
+    libs = [steam]
+    try:
+        with open(os.path.join(steam, "steamapps", "libraryfolders.vdf"), encoding="utf-8", errors="ignore") as f:
+            libs += [x.replace("\\\\", "\\") for x in re.findall(r'"path"\s+"([^"]+)"', f.read())]
+    except OSError:
+        pass
+    out, seen = [], set()
+    for lib in libs:
+        for acf in glob.glob(os.path.join(lib, "steamapps", "appmanifest_*.acf")):
+            try:
+                with open(acf, encoding="utf-8", errors="ignore") as f:
+                    t = f.read()
+                aid = re.search(r'"appid"\s+"(\d+)"', t).group(1)
+                name = re.search(r'"name"\s+"([^"]+)"', t).group(1)
+                idir = re.search(r'"installdir"\s+"([^"]+)"', t)
+            except Exception:
+                continue
+            if aid in seen or aid == "228980" or re.search(r"redistributable|proton|runtime|steamworks", name, re.I):
+                continue
+            seen.add(aid)
+            out.append((aid, name, os.path.join(lib, "steamapps", "common", idir.group(1)) if idir else ""))
+    return out
+
+
+def find_content_manager(ac_dir):
+    home = os.path.expanduser("~")
+    dirs = [ac_dir, os.path.join(home, "Desktop"), os.path.join(home, "Downloads"), os.path.join(home, "Documents"),
+            os.path.join(home, "Documents", "Assetto Corsa"), os.path.join(os.environ.get("LOCALAPPDATA", ""), "AcTools Content Manager")]
+    for d in dirs:
+        if not d or not os.path.isdir(d):
+            continue
+        for pat in ("Content Manager*.exe", "*/Content Manager*.exe"):
+            hit = glob.glob(os.path.join(d, pat))
+            if hit:
+                return hit[0]
+    return None
+
+
+def launchers():
+    if time.time() - _LAUNCH_CACHE["t"] < 120:
+        return _LAUNCH_CACHE["list"]
+    out = []
+    games = steam_games()
+    games.sort(key=lambda g: (not any(w in g[1].lower() for w in SIM_WORDS), g[1].lower()))
+    ac = next((g for g in games if g[0] == "244210"), None)
+    cm = find_content_manager(ac[2] if ac else "")
+    if cm:
+        out.append({"id": "cm", "name": "Content Manager (AC)", "path": cm, "sim": True})
+    for aid, name, _ in games:
+        out.append({"id": "steam" + aid, "name": name, "path": "steam://rungameid/" + aid, "sim": any(w in name.lower() for w in SIM_WORDS)})
+    extra = load_json(os.path.join(BASE, "launchers.json"), [])
+    if isinstance(extra, list):
+        out = [x for x in extra if isinstance(x, dict) and x.get("id") and x.get("path")] + out
+    _LAUNCH_CACHE.update(t=time.time(), list=out)
+    return out
+
+
+def open_on_pc(what):
+    """Ouvre la galerie Videos / Photos de RSIM sur l'ecran du PC."""
+    page = {"videos": "videos.html", "photos": "photos.html", "telemetry": "telemetry.html"}.get(what)
+    if page:
+        open_app_window("http://localhost:%d/%s" % (PORT[0], page))
+        return True
+    return False
+
+
+PORT = [8888]
+
+
+def launch(lid):
+    """Lance uniquement une entree de la liste ci-dessus (jamais une commande envoyee par le telephone)."""
+    it = next((x for x in launchers() if x["id"] == lid), None)
+    if not it:
+        return False
+    print("  > Lancement :", it["name"])
+    if sys.platform == "win32":
+        os.startfile(it["path"])
+    return True
+
+
+# anciennes button box (remplacees par une box par jeu, touches simples)
+OLD_BB = {"bb_gt3": "bbg_acc", "bb_rally": "bbg_acr", "bb_proto": "bbg_lmu"}
+
+
 def qv(q, k):
     return (q.get(k) or [""])[0]
 
@@ -528,6 +723,7 @@ def main():
     ap.add_argument("--demo", action="store_true", help="donnees simulees (sans jeu)")
     ap.add_argument("--no-browser", action="store_true", help="ne pas ouvrir le panneau RSIM Dash")
     a = ap.parse_args()
+    PORT[0] = a.port
     st = State(demo=a.demo)
     threading.Thread(target=source_loop, args=(st,), daemon=True).start()
     st.joy = inputs.JoyWatcher(st.on_button)

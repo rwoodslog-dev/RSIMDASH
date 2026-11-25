@@ -1,0 +1,556 @@
+[
+ {
+  "id": "lmu_gt3",
+  "name": "LMU · GT3",
+  "game": "Le Mans Ultimate",
+  "match": [
+   "gt3",
+   "lmgt3"
+  ],
+  "base": {
+   "angle": 1080,
+   "gameFfb": 100,
+   "maxTorque": 80,
+   "roadSens": 6,
+   "damper": 10,
+   "friction": 5,
+   "inertia": 120,
+   "speedDamp": 0,
+   "spring": 0,
+   "maxSpeed": 100
+  },
+  "eq": [
+   100,
+   100,
+   100,
+   100,
+   100,
+   100
+  ],
+  "game_settings": [
+   [
+    "Force FFB (Force Feedback strength)",
+    "55 %"
+   ],
+   [
+    "Lissage FFB (smoothing)",
+    "0"
+   ],
+   [
+    "Couple minimum (minimum torque)",
+    "0 %"
+   ],
+   [
+    "Rotation volant",
+    "Auto (selon la voiture)"
+   ],
+   [
+    "Effets bordures / vibreurs",
+    "50 %"
+   ]
+  ],
+  "pedals": {
+   "throttle": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ],
+   "brake": [
+    0,
+    20,
+    44,
+    70,
+    100
+   ],
+   "clutch": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ]
+  },
+  "notes": "Rotation : laisse le jeu régler l'angle de la voiture (soft lock). Baisse la force FFB si le volant clippe dans les grandes courbes.",
+  "updated": 1795541191
+ },
+ {
+  "id": "lmu_hyper",
+  "name": "LMU · Hypercar / LMP2",
+  "game": "Le Mans Ultimate",
+  "match": [
+   "hypercar",
+   "lmh",
+   "lmdh",
+   "lmp2",
+   "lmp"
+  ],
+  "base": {
+   "angle": 1080,
+   "gameFfb": 100,
+   "maxTorque": 85,
+   "roadSens": 6,
+   "damper": 12,
+   "friction": 5,
+   "inertia": 120,
+   "speedDamp": 0,
+   "spring": 0,
+   "maxSpeed": 100
+  },
+  "eq": [
+   100,
+   100,
+   100,
+   100,
+   100,
+   100
+  ],
+  "game_settings": [
+   [
+    "Force FFB (Force Feedback strength)",
+    "55 %"
+   ],
+   [
+    "Lissage FFB (smoothing)",
+    "0"
+   ],
+   [
+    "Couple minimum (minimum torque)",
+    "0 %"
+   ],
+   [
+    "Rotation volant",
+    "Auto (selon la voiture)"
+   ],
+   [
+    "Effets bordures / vibreurs",
+    "50 %"
+   ]
+  ],
+  "pedals": {
+   "throttle": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ],
+   "brake": [
+    0,
+    20,
+    44,
+    70,
+    100
+   ],
+   "clutch": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ]
+  },
+  "notes": "Direction plus lourde : 5-10 % de force en moins qu'en GT3.",
+  "updated": 1795541191
+ },
+ {
+  "id": "acc_gt3",
+  "name": "ACC · GT3 / GT4",
+  "game": "ACC",
+  "match": [
+   "gt3",
+   "gt4",
+   "acc"
+  ],
+  "base": {
+   "angle": 900,
+   "gameFfb": 100,
+   "maxTorque": 80,
+   "roadSens": 5,
+   "damper": 10,
+   "friction": 5,
+   "inertia": 120,
+   "speedDamp": 0,
+   "spring": 0,
+   "maxSpeed": 100
+  },
+  "eq": [
+   100,
+   100,
+   100,
+   100,
+   100,
+   100
+  ],
+  "game_settings": [
+   [
+    "Gain",
+    "65 %"
+   ],
+   [
+    "Force min.",
+    "0 %"
+   ],
+   [
+    "Amortissement dynamique",
+    "100 %"
+   ],
+   [
+    "Effets de route",
+    "5 %"
+   ],
+   [
+    "Fréquence",
+    "333 Hz"
+   ],
+   [
+    "Rotation",
+    "Auto (jeu) - Pit House 900°"
+   ],
+   [
+    "Linéarité direction",
+    "1.0"
+   ],
+   [
+    "Gamma frein",
+    "2.4"
+   ]
+  ],
+  "pedals": {
+   "throttle": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ],
+   "brake": [
+    0,
+    20,
+    44,
+    70,
+    100
+   ],
+   "clutch": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ]
+  },
+  "notes": "ACC règle l'angle tout seul. Pit House : 900° minimum.",
+  "updated": 1795541191
+ },
+ {
+  "id": "acr_rally",
+  "name": "AC Rally · Rallye",
+  "game": "AC Rally",
+  "match": [
+   "rally",
+   "i20",
+   "wrc",
+   "rally2",
+   "r5"
+  ],
+  "base": {
+   "angle": 540,
+   "gameFfb": 100,
+   "maxTorque": 90,
+   "roadSens": 9,
+   "damper": 8,
+   "friction": 3,
+   "inertia": 110,
+   "speedDamp": 0,
+   "spring": 0,
+   "maxSpeed": 100
+  },
+  "eq": [
+   100,
+   100,
+   110,
+   120,
+   110,
+   100
+  ],
+  "game_settings": [
+   [
+    "Force FFB",
+    "70 %"
+   ],
+   [
+    "Amortissement",
+    "20 %"
+   ],
+   [
+    "Effets de route",
+    "40 %"
+   ],
+   [
+    "Filtre / lissage",
+    "0"
+   ],
+   [
+    "Rotation",
+    "Auto (jeu)"
+   ]
+  ],
+  "pedals": {
+   "throttle": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ],
+   "brake": [
+    0,
+    22,
+    46,
+    72,
+    100
+   ],
+   "clutch": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ]
+  },
+  "notes": "Rallye : volant vif et détaillé (route à 9). Angle 540° pour réagir vite dans les épingles.",
+  "updated": 1795541191
+ },
+ {
+  "id": "ac_road",
+  "name": "Assetto Corsa · route / GT",
+  "game": "Assetto Corsa",
+  "match": [],
+  "base": {
+   "angle": 900,
+   "gameFfb": 100,
+   "maxTorque": 75,
+   "roadSens": 7,
+   "damper": 10,
+   "friction": 5,
+   "inertia": 120,
+   "speedDamp": 0,
+   "spring": 0,
+   "maxSpeed": 100
+  },
+  "eq": [
+   100,
+   100,
+   100,
+   100,
+   100,
+   100
+  ],
+  "game_settings": [
+   [
+    "Gain",
+    "80 %"
+   ],
+   [
+    "Filtre",
+    "0 %"
+   ],
+   [
+    "Force min.",
+    "0 %"
+   ],
+   [
+    "Vibreurs",
+    "20 %"
+   ],
+   [
+    "Effets de route",
+    "0 %"
+   ],
+   [
+    "Glisse",
+    "0 %"
+   ],
+   [
+    "Amortissement",
+    "0 %"
+   ]
+  ],
+  "pedals": {
+   "throttle": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ],
+   "brake": [
+    0,
+    20,
+    44,
+    70,
+    100
+   ],
+   "clutch": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ]
+  },
+  "notes": "",
+  "updated": 1795541191
+ },
+ {
+  "id": "ams2_gt",
+  "name": "AMS2 · GT / proto",
+  "game": "Automobilista 2",
+  "match": [],
+  "base": {
+   "angle": 1080,
+   "gameFfb": 100,
+   "maxTorque": 80,
+   "roadSens": 6,
+   "damper": 10,
+   "friction": 5,
+   "inertia": 120,
+   "speedDamp": 0,
+   "spring": 0,
+   "maxSpeed": 100
+  },
+  "eq": [
+   100,
+   100,
+   100,
+   100,
+   100,
+   100
+  ],
+  "game_settings": [
+   [
+    "Profil FFB",
+    "Custom"
+   ],
+   [
+    "Gain",
+    "60"
+   ],
+   [
+    "Volume",
+    "60"
+   ],
+   [
+    "Tone",
+    "50"
+   ],
+   [
+    "FX",
+    "40"
+   ],
+   [
+    "Ressort",
+    "0"
+   ],
+   [
+    "Zone morte (deadzone removal)",
+    "0"
+   ]
+  ],
+  "pedals": {
+   "throttle": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ],
+   "brake": [
+    0,
+    20,
+    44,
+    70,
+    100
+   ],
+   "clutch": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ]
+  },
+  "notes": "",
+  "updated": 1795541191
+ },
+ {
+  "id": "r3e_gt",
+  "name": "RaceRoom · GT",
+  "game": "RaceRoom",
+  "match": [],
+  "base": {
+   "angle": 1080,
+   "gameFfb": 100,
+   "maxTorque": 80,
+   "roadSens": 6,
+   "damper": 10,
+   "friction": 5,
+   "inertia": 120,
+   "speedDamp": 0,
+   "spring": 0,
+   "maxSpeed": 100
+  },
+  "eq": [
+   100,
+   100,
+   100,
+   100,
+   100,
+   100
+  ],
+  "game_settings": [
+   [
+    "Multiplicateur FFB",
+    "80 %"
+   ],
+   [
+    "Force min.",
+    "0 %"
+   ],
+   [
+    "Vibration",
+    "0 %"
+   ],
+   [
+    "Rotation",
+    "Auto (Pit House 1080°)"
+   ]
+  ],
+  "pedals": {
+   "throttle": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ],
+   "brake": [
+    0,
+    20,
+    44,
+    70,
+    100
+   ],
+   "clutch": [
+    0,
+    25,
+    50,
+    75,
+    100
+   ]
+  },
+  "notes": "",
+  "updated": 1795541191
+ }
+]

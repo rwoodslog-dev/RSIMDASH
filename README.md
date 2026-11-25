@@ -108,3 +108,40 @@ L'éditeur : bouton « Créer un dashboard » ou « Éditer » dans le panneau.
 ### Obtenir l'APK (automatique)
 - À chaque envoi, GitHub construit l'APK : onglet **Actions** → dernier « Build APK RSIM » → **Artifacts** → `RSIM-apk` (zip contenant `app-debug.apk`).
 - Copie l'APK sur le téléphone et installe-le (autoriser « sources inconnues »). Pour le prêter à un collègue : même APK.
+
+## Télémétrie (tours)
+- Chaque tour complet est enregistré tout seul (20 mesures/s) dans `telemetry/` : session = jeu + voiture + piste.
+- Accueil → Télémétrie : coche jusqu'à 4 tours → delta, vitesse, gaz, frein, rapport, régime, volant superposés.
+- ⬇ sur un tour = fichier .json à envoyer à un pote ; il l'ouvre avec « Importer un tour ».
+
+## Profils FFB
+- Accueil → Profils FFB : base Moza R12 (Pit House), réglages en jeu, courbes de pédales, notes.
+- Le profil de la voiture en cours est repéré automatiquement (bandeau vert). Export / import en .json pour partager.
+- Les valeurs fournies sont des points de départ. Pit House n'ayant pas d'API, les valeurs sont à recopier (ou à garder en preset Pit House du même nom).
+
+## Vidéos (capture + replay)
+1. Télécharge **ffmpeg** : sur gyan.dev → « ffmpeg-release-essentials.zip », copie `bin\ffmpeg.exe` à côté de `server.py`.
+2. Accueil → Vidéos → ⚙ Réglages capture → « Tester les méthodes » (avec ta RX 5600 XT : *Écran (GPU) → AMD AMF*).
+3. Son du jeu : active « Mixage stéréo » dans Windows (Paramètres son → Plus de paramètres → Enregistrement), puis choisis-le dans les réglages.
+- **Ctrl+Alt+R** : vidéo marche / arrêt · **Ctrl+Alt+B** : replay on/off · **Ctrl+Alt+C** : sauver le replay (les N dernières secondes).
+- Aussi assignables à un bouton du G29 (Boutons volant) ou de la button box (Stream : REC / REPLAY / SAUVER REPLAY).
+- Chaque vidéo est gardée dans `videos/` avec sa télémétrie (.json) et une miniature. Le lecteur affiche l'overlay synchronisé
+  (réglage de synchro si décalage) et « Exporter avec l'overlay » crée une vidéo avec le dash incrusté.
+- Le jeu doit être en **plein écran fenêtré / sans bordure** pour être capturé.
+
+## Button box par jeu
+- Une box par jeu (LMU, ACC, AC Rally, AMS2, RaceRoom, AC) avec seulement les commandes du jeu.
+- Chaque bouton envoie **une seule touche** (pavé numérique, Inser, Suppr, ², ; : etc.), jamais deux fois la même :
+  dans le jeu, clique la commande puis appuie sur le bouton du téléphone (colonne **Clavier**).
+- AC Rally : laisse « Périphérique de commandes actif » sur **Automatique**.
+
+## Photos et montage TikTok
+- Photos : Ctrl+Alt+P en jeu (ou bouton), « Garder cette image » dans une vidéo, ou import. Retouche HDR / filtres / formats fond d'écran.
+- Montage TikTok : coche des vidéos → RSIM choisit les meilleurs passages grâce à la télémétrie → vidéo 9:16 avec titre, télémétrie, musique.
+
+## Télécommande PC (souris / manette / stream deck)
+- Accueil → Télécommande PC (ou appui long sur le dash → « Cet appareil affiche » → Télécommande).
+- Souris : trackpad (tape = clic, 2 doigts = défiler / clic droit, double tape + glisser = maintenir), boutons clic gauche / droit, clavier (écris puis ➤).
+- Manette : croix + A/B/X/Y + LB/RB/LT/RT envoient des touches clavier (⚙ pour changer).
+- Stream deck : vidéo, replay, photo, média, volume, lancer un jeu Steam. Tes applis : crée `launchers.json`
+  à côté de server.py, ex. `[{"id":"obs","name":"OBS","path":"C:/Program Files/obs-studio/bin/64bit/obs64.exe"}]`.

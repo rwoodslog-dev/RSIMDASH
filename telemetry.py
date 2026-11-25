@@ -93,7 +93,8 @@ def blank():
                 tc=None, abs=None, map=None, bb=None, limiter=False, lights=False, absActive=False,
                 tcActive=False, water=None, oil=None, turbo=None, tyreT=[None] * 4, tyreP=[None] * 4,
                 brakeT=[None] * 4, tyreWear=[None] * 4, lap=0, pos=0, cur=None, last=None, best=None,
-                delta=None, sessionLeft=None, inPit=False, paused=False)
+                delta=None, sessionLeft=None, inPit=False, paused=False,
+                track="", steer=None, lapPct=None, trackLen=None)
 
 
 # ---------------------------------------------------------------- Assetto Corsa / ACC / AC Rally
@@ -145,6 +146,10 @@ class AcFamily:
         d = blank()
         d["game"] = self.label
         d["car"] = wstr(s, 68, 33)
+        d["track"] = wstr(s, 134, 33)
+        d["steer"] = f32(p, 24)
+        lp = f32(g, 248)
+        d["lapPct"] = lp if 0 <= lp <= 1 else None
         gear = i32(p, 16)
         d["gear"] = gear - 1                       # AC : 0=R 1=N 2=1ere
         d["rpm"] = float(i32(p, 20))
@@ -240,6 +245,9 @@ class LMU:
                 break
         d = blank()
         d["game"] = "Le Mans Ultimate"
+        d["track"] = cstr(s, 12, 64)
+        tl = f64(s, 12 + 88)
+        d["trackLen"] = tl if 100 < tl < 100000 else None
         if vo is None:
             d["paused"] = True
             return d
@@ -250,6 +258,10 @@ class LMU:
             d["best"] = pos_or_none(f64(s, ps + 144))
             d["last"] = pos_or_none(f64(s, ps + 168))
             d["cur"] = pos_or_none(f64(s, ps + 464))
+            ld = f64(s, ps + 104)
+            if d["trackLen"] and 0 <= ld <= d["trackLen"] * 1.01:
+                d["lapPct"] = min(1.0, ld / d["trackLen"])
+        d["steer"] = f64(t, vo + 404)
         d["gear"] = i32(t, vo + 352)
         d["rpm"] = f64(t, vo + 356)
         d["maxRpm"] = f64(t, vo + 532)
@@ -313,10 +325,16 @@ class AMS2:
         d["game"] = "Automobilista 2"
         d["car"] = cstr(b, 6444, 64)
         d["carClass"] = cstr(b, 6508, 64)
+        d["track"] = (cstr(b, 6576, 64) + " " + cstr(b, 6640, 64)).strip()
+        tl = f32(b, 6704)
+        d["trackLen"] = tl if 100 < tl < 100000 else None
         vi = i32(b, 20)
         if 0 <= vi < 64:
-            po = 28 + vi * 100
-            d["pos"], d["lap"] = u32(b, po + 80), u32(b, po + 84)
+            po = 28 + vi * 100          # ParticipantInfo (100 o) : lapDist 80, position 84, tours faits 88, tour en cours 92
+            d["pos"], d["lap"] = u32(b, po + 84), u32(b, po + 92)
+            ld = f32(b, po + 80)
+            if d["trackLen"] and 0 <= ld <= d["trackLen"] * 1.01:
+                d["lapPct"] = min(1.0, ld / d["trackLen"])
         d["best"], d["last"], d["cur"] = (pos_or_none(f32(b, 6716)), pos_or_none(f32(b, 6720)),
                                           pos_or_none(f32(b, 6724)))
         flags = u32(b, 6816)
@@ -328,6 +346,7 @@ class AMS2:
         d["speed"] = f32(b, 6848) * 3.6
         d["rpm"], d["maxRpm"] = f32(b, 6852), f32(b, 6856)
         d["brake"], d["throttle"], d["clutch"] = f32(b, 6860), f32(b, 6864), f32(b, 6868)
+        d["steer"] = f32(b, 6872)
         d["gear"] = i32(b, 6876)
         d["absActive"] = bool(u8(b, 6888))
         d["tyreT"] = f32n(b, 7072, 4)
@@ -436,13 +455,16 @@ class Demo:
         lap_t = t % 90.0
         d = blank()
         d["game"], d["car"] = self.game, self.car
+        d["track"] = "Circuit démo"
+        d["lapPct"] = lap_t / 90.0
+        d["steer"] = 0.6 * math.sin(lap_t / 4.0) * (1 - min(1.0, (t % 24.0) / 20.0) * 0.5)
         cyc = (t % 6.0) / 6.0
         gear = 1 + int((t % 24.0) / 4.0)
         frac = min(1.0, cyc * 1.15)
         d["gear"] = gear if (t % 24.0) < 22 else 2
         d["maxRpm"] = self.max_rpm
         d["rpm"] = self.max_rpm * (0.55 + 0.45 * frac)
-        d["speed"] = 60 + gear * 30 * (0.6 + 0.4 * frac)
+        d["speed"] = (60 + gear * 30 * (0.6 + 0.4 * frac)) * (1 + 0.03 * math.sin(int(t // 90) * 1.7 + lap_t / 13))
         d["throttle"] = 1.0 if (t % 24.0) < 20 else 0.0
         d["brake"] = 0.0 if (t % 24.0) < 20 else 0.9
         d["fuel"], d["fuelCap"], d["fuelPerLap"] = max(5, 80 - t * 0.04), 100, 3.1

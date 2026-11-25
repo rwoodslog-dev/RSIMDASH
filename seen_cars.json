@@ -10,5 +10,23 @@
     "car": "Hyundai i20N Rally2",
     "cls": "",
     "last": 1795472162
+  },
+  "ACC / AC Rally|Lancia Delta S4": {
+    "game": "ACC / AC Rally",
+    "car": "Lancia Delta S4",
+    "cls": "",
+    "last": 1795619267
+  },
+  "ACC / AC Rally|VW Polo GTI R5": {
+    "game": "ACC / AC Rally",
+    "car": "VW Polo GTI R5",
+    "cls": "",
+    "last": 1795621952
+  },
+  "ACC / AC Rally|Peugeot 208 Rally4": {
+    "game": "ACC / AC Rally",
+    "car": "Peugeot 208 Rally4",
+    "cls": "",
+    "last": 1795622170
   }
 }
