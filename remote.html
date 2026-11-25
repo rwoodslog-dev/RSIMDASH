@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#060606">
+<link rel="icon" href="icon-192.png">
+<title>RSIM · Télécommande</title>
+<style>
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#060606; color:#f4f4f4; font-family:"Titillium Web", Rajdhani, sans-serif; touch-action:none; }
+  body::before { content:""; position:fixed; top:0; left:0; right:0; height:5px; background:repeating-conic-gradient(#f4f4f4 0 25%, #0a0a0a 0 50%) 0 0 / 10px 10px; z-index:9; }
+  #tabs { position:fixed; top:5px; left:0; right:0; height:42px; display:flex; gap:4px; padding:4px max(8px, env(safe-area-inset-left)); background:#0b0b0b; border-bottom:2px solid #e10600; z-index:8; }
+  #tabs button, #tabs a { flex:1; border:0; color:#bbb; background:#151515; font:italic 900 14px "Titillium Web", sans-serif; text-transform:uppercase; letter-spacing:1px;
+    clip-path:polygon(8px 0,100% 0,calc(100% - 8px) 100%,0 100%); text-decoration:none; display:flex; align-items:center; justify-content:center; }
+  #tabs .on { background:#e10600; color:#fff; } #tabs a { flex:0 0 70px; }
+  .page { position:fixed; top:49px; left:0; right:0; bottom:0; display:none; padding:8px max(10px, env(safe-area-inset-left)) 8px max(10px, env(safe-area-inset-right)); }
+  .page.on { display:grid; }
+  .k { border:1px solid #2c2c2c; background:linear-gradient(180deg, #1d1d1d, #0f0f0f); color:#fff; border-radius:8px; font:italic 900 18px "Titillium Web", sans-serif;
+    text-transform:uppercase; display:flex; align-items:center; justify-content:center; text-align:center; touch-action:none; padding:4px; }
+  .k:active, .k.down { background:#e10600; border-color:#ff4d42; transform:scale(.97); }
+  .k small { display:block; font-size:11px; color:#aaa; font-style:normal; font-weight:600; }
+  .k.on { background:#e10600; box-shadow:0 0 18px #e10600; }
+  /* page 1 : trackpad */
+  #p1 { grid-template-columns: 110px 1fr 70px; gap:8px; }
+  #p1 .col { display:grid; gap:8px; }
+  #pad { border-radius:14px; border:1px solid #333; background:#0d0d0d radial-gradient(circle at 50% 50%, #161616, #0b0b0b); position:relative; touch-action:none; }
+  #pad::after { content:"TRACKPAD · 1 doigt = souris · tape = clic · 2 doigts = défiler / clic droit"; position:absolute; bottom:8px; left:0; right:0; text-align:center; font-size:11px; color:#555; }
+  #scroll { border-radius:14px; border:1px solid #333; background:repeating-linear-gradient(0deg, #121212 0 18px, #191919 18px 20px); position:relative; }
+  #kbd { position:fixed; left:0; right:0; top:49px; background:#0b0b0b; border-bottom:2px solid #e10600; padding:8px; display:none; gap:6px; z-index:7; flex-wrap:wrap; }
+  #kbd input { flex:1; min-width:200px; font-size:18px; padding:8px; background:#000; color:#fff; border:1px solid #444; -webkit-user-select:text; user-select:text; }
+  #kbd .k { padding:6px 12px; font-size:14px; }
+  /* page 2 : manette */
+  #p2 { grid-template-columns: 1fr 1fr 1fr; align-items:end; padding-bottom:26px; }
+  .dpad, .abxy { position:relative; width:min(calc(100vh - 200px), 30vw); height:min(calc(100vh - 200px), 30vw); justify-self:center; }
+  .dpad .k, .abxy .k { position:absolute; width:34%; height:34%; }
+  .dpad .u { left:33%; top:0; } .dpad .d { left:33%; bottom:0; } .dpad .l { left:0; top:33%; } .dpad .r { right:0; top:33%; }
+  .abxy .k { border-radius:50%; font-size:24px; }
+  .abxy .y { left:33%; top:0; color:#ffd400; } .abxy .a { left:33%; bottom:0; color:#21e05d; } .abxy .x { left:0; top:33%; color:#2fb7ff; } .abxy .b { right:0; top:33%; color:#ff4d42; }
+  .mid { display:grid; gap:10px; justify-items:center; align-content:end; }
+  .mid .k { width:130px; height:52px; font-size:15px; }
+  .sh { position:absolute; top:8px; width:22vw; height:52px; } .sh.l { left:max(10px, env(safe-area-inset-left)); } .sh.r { right:max(10px, env(safe-area-inset-right)); }
+  .sh2 { top:66px; }
+  #p2 .cfg { position:absolute; bottom:6px; left:50%; transform:translateX(-50%); font-size:11px; color:#777; }
+  /* page 3 : stream deck */
+  #p3 { grid-template-columns: repeat(6, 1fr); grid-auto-rows: minmax(74px, auto); gap:8px; overflow-y:auto; touch-action:pan-y; align-content:start; }
+  #p3 .grp { min-height:22px; }
+  #p3 .k { font-size:15px; flex-direction:column; }
+  #p3 .k .i { font-size:28px; font-style:normal; line-height:1.1; }
+  #p3 .grp { grid-column: 1 / -1; font:italic 900 12px "Titillium Web", sans-serif; color:#e10600; letter-spacing:2px; align-self:end; }
+  #map { position:fixed; inset:60px 10% 10px; background:#0b0b0b; border:1px solid #e10600; padding:12px; z-index:10; display:none; overflow:auto; }
+  #map select { background:#000; color:#fff; border:1px solid #444; padding:4px; }
+  #map .r { display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid #1d1d1d; }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,600;1,900&display=swap">
+</head>
+<body>
+<div id="tabs">
+  <a href="index.html?home" onclick="localStorage.setItem('devLock','')">⌂</a>
+  <button data-p="p1" class="on">🖱 Souris</button><button data-p="p2">🎮 Manette</button><button data-p="p3">🎛 Stream deck</button>
+</div>
+
+<!-- PAGE 1 : trackpad + clavier -->
+<div class="page on" id="p1">
+  <div class="col">
+    <div class="k" id="bL" style="grid-row:span 2">CLIC<br>GAUCHE</div>
+    <div class="k" id="bR">CLIC<br>DROIT</div>
+    <div class="k" id="bKbd">⌨<small>clavier</small></div>
+  </div>
+  <div id="pad"></div>
+  <div class="col"><div id="scroll"></div><div class="k" id="bEsc" style="font-size:13px">ÉCHAP</div></div>
+</div>
+<div id="kbd">
+  <input id="txt" placeholder="Tape : chaque lettre s'écrit tout de suite sur le PC" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <div class="k" data-key="BACKSPACE">⌫</div><div class="k" data-key="ENTER">↵</div><div class="k" data-key="TAB">TAB</div>
+  <div class="k" data-key="LCTRL+C">COPIER</div><div class="k" data-key="LCTRL+V">COLLER</div><div class="k" data-key="LALT+TAB">ALT+TAB</div>
+  <div class="k" id="kClose">✕</div>
+</div>
+
+<!-- PAGE 2 : manette (touches clavier des menus) -->
+<div class="page" id="p2">
+  <div class="k sh l" data-b="LB">LB</div><div class="k sh r" data-b="RB">RB</div>
+  <div class="k sh l sh2" data-b="LT">LT</div><div class="k sh r sh2" data-b="RT">RT</div>
+  <div class="dpad"><div class="k u" data-b="UP">▲</div><div class="k l" data-b="LEFT">◀</div><div class="k r" data-b="RIGHT">▶</div><div class="k d" data-b="DOWN">▼</div></div>
+  <div class="mid"><div class="k" data-b="SELECT">SELECT</div><div class="k" data-b="START">START</div><div class="k" data-b="HOME">ALT+TAB</div></div>
+  <div class="abxy"><div class="k y" data-b="Y">Y</div><div class="k x" data-b="X">X</div><div class="k b" data-b="B">B</div><div class="k a" data-b="A">A</div></div>
+  <div class="cfg" id="bMap">⚙ choisir les touches</div>
+</div>
+<div id="map"></div>
+
+<!-- PAGE 3 : stream deck -->
+<div class="page" id="p3"></div>
+
+<script src="api.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const post = (u, b) => fetch(u, { method: "POST", body: JSON.stringify(b || {}) }).catch(() => {});
+const act = a => post("api/action", { action: a });
+const inp = b => post("api/input", b);
+function toast(m) { let t = $("toastR"); if (!t) { t = document.createElement("div"); t.id = "toastR";
+  t.style.cssText = "position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#e10600;color:#fff;padding:8px 16px;font:italic 900 14px 'Titillium Web',sans-serif;z-index:20;text-transform:uppercase";
+  document.body.appendChild(t); } t.textContent = m; t.style.display = "block"; clearTimeout(t.h); t.h = setTimeout(() => t.style.display = "none", 1800); }
+const vib = ms => navigator.vibrate && navigator.vibrate(ms || 12);
+
+/* onglets + paysage verrouille */
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b));
+  document.querySelectorAll(".page").forEach(p => p.classList.toggle("on", p.id === b.dataset.p)); localStorage.setItem("remoteTab", b.dataset.p); });
+const lastTab = localStorage.getItem("remoteTab"); if (lastTab) document.querySelector(`#tabs [data-p="${lastTab}"]`).click();
+(async () => { const P = window.Capacitor && window.Capacitor.Plugins;
+  try { if (P && P.ScreenOrientation) await P.ScreenOrientation.lock({ orientation: localStorage.getItem("orient") || "landscape-primary" }); else await screen.orientation.lock("landscape"); } catch (e) {}
+  try { if (P && P.KeepAwake) P.KeepAwake.keepAwake(); else if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {} })();
+
+/* plein ecran : barres Android cachees (APK) + plein ecran navigateur au 1er contact */
+function goFull() {
+  const P = window.Capacitor && window.Capacitor.Plugins;
+  try { if (P && P.StatusBar) P.StatusBar.hide(); } catch (e) {}
+  const d = document.documentElement;
+  if (!document.fullscreenElement && d.requestFullscreen) d.requestFullscreen({ navigationUI: "hide" }).catch(() => {});
+}
+goFull();
+document.addEventListener("pointerdown", goFull, { capture: true });
+let wl = null;
+async function awake() { const P = window.Capacitor && window.Capacitor.Plugins;   // ecran toujours allume sur cette page
+  try { if (P && P.KeepAwake) { await P.KeepAwake.keepAwake(); return; } } catch (e) {}
+  try { if (navigator.wakeLock && !wl) { wl = await navigator.wakeLock.request("screen"); wl.addEventListener("release", () => wl = null); } } catch (e) {} }
+awake();
+document.addEventListener("visibilitychange", () => { if (!document.hidden) { goFull(); awake(); } });
+document.addEventListener("pointerdown", awake, { capture: true, once: true });
+
+/* ---------- PAGE 1 : trackpad ---------- */
+let acc = [0, 0], sending = false, sens = +(localStorage.getItem("padSens") || 2.2);
+async function flush() { if (sending || (!acc[0] && !acc[1])) return; const dx = Math.round(acc[0]), dy = Math.round(acc[1]); if (!dx && !dy) return;
+  acc[0] -= dx; acc[1] -= dy; sending = true; await inp({ t: "move", dx, dy }); sending = false; }
+setInterval(flush, 12);
+const pad = $("pad"), touches = new Map(); let gesture = null, dragHold = false, lastTap = 0;
+pad.addEventListener("pointerdown", e => { pad.setPointerCapture(e.pointerId); touches.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t: performance.now() });
+  if (touches.size === 1) { gesture = { n: 1, moved: 0, t: performance.now() };
+    if (performance.now() - lastTap < 260) { dragHold = true; inp({ t: "btn", b: "left", down: true }); vib(20); } }   // double tape + glisser = maintenir le clic
+  else gesture = { n: touches.size, moved: 0, t: performance.now() }; });
+pad.addEventListener("pointermove", e => { const p = touches.get(e.pointerId); if (!p) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY; gesture.moved += Math.abs(dx) + Math.abs(dy);
+  if (touches.size >= 2) { if (e.pointerId === [...touches.keys()][0]) { scrollAcc += dy; if (Math.abs(scrollAcc) > 14) { inp({ t: "wheel", d: -Math.sign(scrollAcc) * 120 }); scrollAcc = 0; } } return; }
+  const v = Math.hypot(dx, dy), k = sens * (1 + Math.min(2.5, v / 12));   // acceleration
+  acc[0] += dx * k; acc[1] += dy * k; });
+let scrollAcc = 0;
+function padUp(e) { const p = touches.get(e.pointerId); if (!p) return; touches.delete(e.pointerId);
+  if (touches.size) return;
+  const quick = performance.now() - gesture.t < 250 && gesture.moved < 12;
+  if (dragHold) { inp({ t: "btn", b: "left", down: false }); dragHold = false; }
+  else if (quick && gesture.n >= 2) { inp({ t: "click", b: "right" }); vib(); }
+  else if (quick) { inp({ t: "click", b: "left" }); vib(); lastTap = performance.now(); }
+}
+pad.addEventListener("pointerup", padUp); pad.addEventListener("pointercancel", padUp);
+function holdBtn(el, b) { el.addEventListener("pointerdown", e => { el.setPointerCapture(e.pointerId); el.classList.add("down"); vib(); inp({ t: "btn", b, down: true }); });
+  const up = () => { if (!el.classList.contains("down")) return; el.classList.remove("down"); inp({ t: "btn", b, down: false }); };
+  el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up); }
+holdBtn($("bL"), "left"); holdBtn($("bR"), "right");
+// bande de defilement
+let sy = null; $("scroll").addEventListener("pointerdown", e => { $("scroll").setPointerCapture(e.pointerId); sy = e.clientY; });
+$("scroll").addEventListener("pointermove", e => { if (sy == null) return; const d = e.clientY - sy; if (Math.abs(d) > 12) { inp({ t: "wheel", d: -Math.sign(d) * 120 }); sy = e.clientY; vib(5); } });
+$("scroll").addEventListener("pointerup", () => sy = null);
+$("bEsc").onclick = () => { act("key:ESC"); vib(); };
+// clavier
+$("bKbd").onclick = () => { $("kbd").style.display = "flex"; resetTxt(); $("txt").focus(); };
+$("kClose").onclick = () => { $("kbd").style.display = "none"; $("txt").blur(); };
+/* frappe en direct : on compare le champ avant / apres chaque saisie et on envoie la difference
+   (lettres ajoutees, ou retours arriere) -> marche aussi avec la correction auto du clavier Android */
+const SENT = "  ";        // 2 espaces "tampon" : le retour arriere marche meme quand le champ semble vide
+let prevTxt = SENT, q = Promise.resolve();
+const queue = fn => q = q.then(fn).catch(() => {});
+function resetTxt() { $("txt").value = SENT; prevTxt = SENT; const n = SENT.length; try { $("txt").setSelectionRange(n, n); } catch (e) {} }
+$("txt").addEventListener("input", () => {
+  const now = $("txt").value; let i = 0;
+  while (i < prevTxt.length && i < now.length && prevTxt[i] === now[i]) i++;
+  const del = prevTxt.length - i, add = now.slice(i);
+  if (del > 0) queue(() => inp({ t: "bs", n: del }));
+  if (add) queue(() => inp({ t: "text", s: add }));
+  prevTxt = now;
+  if (now.length < SENT.length || now.length > 120) resetTxt();
+});
+$("txt").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); queue(() => act("key:ENTER")); resetTxt(); vib(); } });
+$("bKbd").addEventListener("click", resetTxt);
+document.querySelectorAll("#kbd [data-key]").forEach(k => k.onclick = () => { act("key:" + k.dataset.key); vib(); });
+
+/* ---------- clavier physique (Bluetooth / USB) branche au telephone -> chaque touche part au PC ----------
+   On envoie la POSITION de la touche (comme un vrai clavier PC) : raccourcis Ctrl/Alt/Maj, fleches, F1-F12, jeux... tout marche. */
+const CODE = { Escape: "ESC", Backspace: "BACKSPACE", Tab: "TAB", Enter: "ENTER", Space: "SPACE", CapsLock: "CAPS",
+  ShiftLeft: "LSHIFT", ShiftRight: "RSHIFT", ControlLeft: "LCTRL", ControlRight: "RCTRL", AltLeft: "LALT", AltRight: "RALT",
+  MetaLeft: "LWIN", MetaRight: "LWIN", ContextMenu: "APPS", Minus: "MINUS", Equal: "EQUALS", BracketLeft: "LBRACKET", BracketRight: "RBRACKET",
+  Semicolon: "SEMICOLON", Quote: "APOS", Backquote: "GRAVE", Backslash: "BACKSLASH", Comma: "COMMA", Period: "PERIOD", Slash: "SLASH",
+  IntlBackslash: "OEM102", ArrowUp: "UP", ArrowDown: "DOWN", ArrowLeft: "LEFT", ArrowRight: "RIGHT", Insert: "INSERT", Delete: "DELETE",
+  Home: "HOME", End: "END", PageUp: "PGUP", PageDown: "PGDN", PrintScreen: "PRTSC", NumLock: "NUMLOCK", ScrollLock: "SCROLL",
+  NumpadAdd: "NUMPLUS", NumpadSubtract: "NUMMINUS", NumpadMultiply: "NUMSTAR", NumpadDivide: "NUMSLASH", NumpadDecimal: "NUMDOT", NumpadEnter: "NUMENTER" };
+function codeName(c) {
+  if (CODE[c]) return CODE[c];
+  let m = c.match(/^Key([A-Z])$/); if (m) return m[1];
+  m = c.match(/^Digit(\d)$/); if (m) return m[1];
+  m = c.match(/^Numpad(\d)$/); if (m) return "NUM" + m[1];
+  m = c.match(/^F(\d{1,2})$/); if (m) return c;
+  return null;
+}
+const held = new Set(); let kq = Promise.resolve(), hwSeen = false;
+const kAct = a => kq = kq.then(() => act(a)).catch(() => {});
+document.addEventListener("keydown", e => {
+  if (e.target && e.target.id === "txt") return;             // le champ texte du clavier tactile garde son propre fonctionnement
+  const n = codeName(e.code || ""); if (!n) return;
+  e.preventDefault();
+  if (!hwSeen) { hwSeen = true; toast("⌨ Clavier détecté : tout ce que tu tapes va sur le PC"); }
+  held.add(n); kAct("keydown:" + n);                          // la repetition auto est geree par les evenements repetes
+}, true);
+document.addEventListener("keyup", e => {
+  if (e.target && e.target.id === "txt") return;
+  const n = codeName(e.code || ""); if (!n) return;
+  e.preventDefault(); held.delete(n); kAct("keyup:" + n);
+}, true);
+function releaseAll() { held.forEach(n => kAct("keyup:" + n)); held.clear(); }   // jamais de touche "coincee"
+addEventListener("blur", releaseAll); document.addEventListener("visibilitychange", () => { if (document.hidden) releaseAll(); });
+
+/* ---------- PAGE 2 : manette ---------- */
+const DEF_MAP = { UP: "UP", DOWN: "DOWN", LEFT: "LEFT", RIGHT: "RIGHT", A: "ENTER", B: "ESC", X: "SPACE", Y: "BACKSPACE",
+  LB: "Q", RB: "E", LT: "PGUP", RT: "PGDN", START: "ESC", SELECT: "TAB", HOME: "LALT+TAB" };
+let MAP = Object.assign({}, DEF_MAP, JSON.parse(localStorage.getItem("padMap") || "{}"));
+document.querySelectorAll("#p2 [data-b]").forEach(el => {
+  let rep = null;
+  el.addEventListener("pointerdown", e => { el.setPointerCapture(e.pointerId); el.classList.add("down"); vib(15);
+    const k = MAP[el.dataset.b]; act("key:" + k);
+    if (["UP", "DOWN", "LEFT", "RIGHT"].includes(el.dataset.b)) rep = setTimeout(function r() { act("key:" + k); rep = setTimeout(r, 110); }, 420);   // repetition
+  });
+  const up = () => { el.classList.remove("down"); clearTimeout(rep); rep = null; };
+  el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
+});
+$("bMap").onclick = async () => {
+  const keys = (await (await fetch("api/bindings")).json()).keys || [];
+  const opts = k => [...new Set([MAP[k], ...keys, "LALT+TAB", "LALT+F4", "LCTRL+TAB"])].map(x => `<option ${x === MAP[k] ? "selected" : ""}>${x}</option>`).join("");
+  $("map").innerHTML = `<b>Touches de la manette</b> (touches clavier envoyées au PC)` + Object.keys(DEF_MAP).map(k => `<div class="r"><span>${k}</span><select data-m="${k}">${opts(k)}</select></div>`).join("") +
+    `<div style="margin-top:10px;display:flex;gap:8px"><button class="k" id="mOk" style="flex:1;height:44px">OK</button><button class="k" id="mDef" style="flex:1;height:44px">Par défaut</button></div>`;
+  $("map").style.display = "block";
+  $("map").querySelectorAll("[data-m]").forEach(s => s.onchange = () => { MAP[s.dataset.m] = s.value; localStorage.setItem("padMap", JSON.stringify(MAP)); });
+  $("mOk").onclick = () => $("map").style.display = "none";
+  $("mDef").onclick = () => { MAP = { ...DEF_MAP }; localStorage.removeItem("padMap"); $("map").style.display = "none"; };
+};
+
+/* ---------- PAGE 3 : stream deck ---------- */
+const DECK = [
+  ["CAPTURE"],
+  ["rec", "●", "Vidéo", "rec_toggle"], ["buf", "⟲", "Replay", "buffer_toggle"], [null, "💾", "Sauver replay", "clip"], [null, "📷", "Photo", "snap"],
+  [null, "🎥", "Vidéos sur le PC", "openpc:videos"], [null, "🖼", "Photos sur le PC", "openpc:photos"],
+  ["MÉDIA & PC"],
+  [null, "⏮", "Précédent", "media:prev"], [null, "⏯", "Lecture", "media:play"], [null, "⏭", "Suivant", "media:next"],
+  [null, "🔉", "Vol −", "media:voldown"], [null, "🔊", "Vol +", "media:volup"], [null, "🔇", "Muet", "media:mute"],
+];
+async function buildDeck() {
+  let L = []; try { L = await (await fetch("api/launchers")).json(); } catch (e) {}
+  const sims = L.filter(x => x.sim), other = L.filter(x => !x.sim);
+  const items = DECK.concat([["LANCER · SIMU"]], sims.map(x => [null, "🏁", x.name, "launch:" + x.id]),
+    other.length ? [["LANCER · AUTRES JEUX"]] : [], other.map(x => [null, "▶", x.name, "launch:" + x.id]));
+  $("p3").innerHTML = items.map(it => it.length === 1 ? `<div class="grp">${it[0]}</div>` :
+    `<div class="k" data-a="${it[3]}" ${it[0] ? `data-s="${it[0]}"` : ""}><span class="i">${it[1]}</span>${it[2]}</div>`).join("");
+  $("p3").querySelectorAll("[data-a]").forEach(el => el.onclick = () => { vib(20); const a = el.dataset.a;
+    if (a.startsWith("openpc:") || a.startsWith("launch:")) toast(a.startsWith("launch:") ? "Lancement sur le PC…" : "Ouvert sur l'écran du PC");
+    if (a.startsWith("go:")) location.href = a.slice(3); else act(a); el.classList.add("down"); setTimeout(() => el.classList.remove("down"), 150); });
+}
+async function deckState() { try { const s = await (await fetch("api/capture")).json();
+  document.querySelectorAll('[data-s="rec"]').forEach(e => e.classList.toggle("on", s.recording));
+  document.querySelectorAll('[data-s="buf"]').forEach(e => e.classList.toggle("on", s.buffering)); } catch (e) {} }
+buildDeck(); setInterval(() => { if ($("p3").classList.contains("on")) deckState(); }, 1000);
+</script>
+</body>
+</html>

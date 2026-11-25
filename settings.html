@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060606">
+<link rel="icon" href="icon-192.png">
+<title>RSIM · Paramètres</title>
+<style>
+  :root { --bg:#0b0e12; --p:#11161d; --p2:#161c24; --b:#232c37; --t:#e6edf3; --m:#8fa3b5; --a:#3fd0ff; --g:#21e05d; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--t); font:15px/1.45 "Segoe UI", Roboto, sans-serif; }
+  header { display:flex; align-items:center; gap:12px; padding:14px 20px; background:var(--p); border-bottom:1px solid var(--b); }
+  header a { color:var(--a); text-decoration:none; font-weight:600; } header h1 { margin:0; font-size:19px; }
+  main { padding:18px 20px; max-width:760px; display:grid; gap:16px; }
+  section { background:var(--p); border:1px solid var(--b); border-radius:14px; padding:16px; }
+  h2 { margin:0 0 10px; font-size:13px; color:var(--a); text-transform:uppercase; letter-spacing:1px; }
+  input, select, button { font:inherit; color:var(--t); background:var(--p2); border:1px solid var(--b); border-radius:8px; padding:10px 12px; }
+  input { width:100%; } button { cursor:pointer; } .pri { background:#1d6fe0; border-color:#1d6fe0; }
+  .row { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; } .row > * { flex:1; min-width:140px; }
+  .hint { color:var(--m); font-size:13px; } .ok { color:var(--g); } .ko { color:#ff6b5a; }
+  ol { margin:6px 0 0; padding-left:20px; color:var(--m); font-size:14px; }
+  .first { background:#12233d; border-color:#1d6fe0; }
+</style>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<header><a href="index.html?home">⌂ Menu</a><h1>Paramètres</h1></header>
+<main>
+  <section id="secPC">
+    <h2>Connexion au PC (RSIM Agent)</h2>
+    <div class="hint" id="mode"></div>
+    <div class="row"><input id="pc" placeholder="ex : 192.168.1.20:8888" inputmode="url" autocapitalize="off" autocorrect="off"></div>
+    <div class="row"><button class="pri" id="bScan">🔍 Rechercher le PC automatiquement</button></div>
+    <div class="row"><button id="bTest">Tester et enregistrer l'adresse</button><button id="bLocal">Ce PC (localhost)</button></div>
+    <div id="res" style="margin-top:10px"></div>
+    <ol>
+      <li>Sur le PC, lance <b>RSIM Dash</b> (raccourci du bureau).</li>
+      <li>L'adresse s'affiche dans la fenêtre noire et dans le panneau (onglet <b>Téléphone</b>) : <code>http://192.168.x.x:8888</code>.</li>
+      <li>Le téléphone doit être sur le <b>même Wi-Fi</b> que le PC. Astuce : IP fixe pour le PC dans ta box.</li>
+    </ol>
+  </section>
+  <section>
+    <h2>Au lancement de l'appli</h2>
+    <div class="row"><select id="start"><option value="home">Ouvrir l'accueil RSIM</option><option value="live">Ouvrir directement le dash en direct</option><option value="remote">Ouvrir directement la télécommande</option></select></div>
+  </section>
+  <section>
+    <h2>Dash en direct</h2>
+    <div class="row"><select id="orient">
+      <option value="landscape-primary">Orientation : paysage (boutons à droite)</option>
+      <option value="landscape-secondary">Orientation : paysage inversé (boutons à gauche)</option>
+      <option value="off">Orientation : libre</option></select></div>
+    <div class="hint" style="margin-top:8px">Verrouille l'écran quand le téléphone est fixé sur le volant.</div>
+  </section>
+  <section>
+    <h2>À venir</h2>
+    <div class="hint">Télémétrie et comparaison de tours · Profils FFB (Pit House + jeux) à enregistrer et partager.</div>
+  </section>
+</main>
+<script src="api.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const Q = new URLSearchParams(location.search);
+if (Q.get("first") || Q.get("from")) { $("secPC").classList.add("first"); }
+$("mode").textContent = RSIMAPI.servedByAgent
+  ? "Tu utilises l'appli servie directement par ton PC : rien à régler ici (adresse : " + location.host + ")."
+  : RSIMAPI.isApp ? "Appli Android : indique l'adresse de ton PC."
+  : "Indique l'adresse de ton PC, ou lance la recherche automatique.";
+$("pc").value = (localStorage.getItem("rsimPC") || (RSIMAPI.servedByAgent ? location.origin + "/" : "")).replace(/^http:\/\//, "").replace(/\/$/, "");
+$("bLocal").onclick = () => { $("pc").value = "localhost:8888"; test(); };
+$("bTest").onclick = test;
+$("bScan").onclick = scan;
+async function scan() {
+  $("bScan").disabled = true;
+  $("res").innerHTML = '<span class="hint">Recherche du PC sur le Wi-Fi… <b id="pct">0%</b></span>';
+  const h = await RSIMAPI.scan(p => { const e = $("pct"); if (e) e.textContent = Math.round(p * 100) + "%"; });
+  $("bScan").disabled = false;
+  if (h) { $("pc").value = h; test(); }
+  else $("res").innerHTML = '<span class="ko">PC non trouvé. Vérifie que RSIM tourne sur le PC et que le téléphone est sur le même Wi-Fi, ou tape l\'adresse affichée sur le PC.</span>';
+}
+async function test() {
+  const v = $("pc").value.trim(); if (!v) return;
+  $("res").innerHTML = '<span class="hint">Connexion…</span>';
+  const u = RSIMAPI.norm(v);
+  const j = await RSIMAPI.ping(u);
+  if (j) {
+    RSIMAPI.setPC(u);
+    $("res").innerHTML = '<span class="ok">✔ PC trouvé' + (j.game ? " — jeu : " + j.game : "") + '. Enregistré.</span>';
+    if (Q.get("from") === "live") setTimeout(() => location.href = "live.html", 800);
+    else if (Q.get("first")) setTimeout(() => location.href = "index.html?home", 800);
+  } else $("res").innerHTML = '<span class="ko">✖ Pas de réponse. Vérifie que RSIM Dash tourne sur le PC, le même Wi-Fi, et le pare-feu Windows (port 8888).</span>';
+}
+if (Q.get("first") && !RSIMAPI.servedByAgent && !localStorage.getItem("rsimPC")) scan();   // 1er lancement : on cherche tout seul
+$("start").value = localStorage.getItem("rsimStart") || "home";
+$("start").onchange = e => localStorage.setItem("rsimStart", e.target.value);
+$("orient").value = localStorage.getItem("orient") || "landscape-primary";
+$("orient").onchange = e => localStorage.setItem("orient", e.target.value);
+</script>
+</body>
+</html>
