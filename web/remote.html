@@ -23,10 +23,10 @@
   .k.on { background:#e10600; box-shadow:0 0 18px #e10600; }
   /* page 1 : trackpad */
   #p1 { grid-template-columns: 1fr 86px; gap:8px; }
-  .padw { display:grid; grid-template-rows: 1fr 74px; gap:0; }
+  .padw { display:grid; grid-template-rows: 1fr 118px; gap:0; }
   .padw #pad { border-bottom-left-radius:0; border-bottom-right-radius:0; }
   .clicks { display:grid; grid-template-columns:1fr 1fr; gap:2px; }
-  .clicks .k { border-top:0; font-size:15px; } .clicks #bL { border-radius:0 0 0 14px; } .clicks #bR { border-radius:0 0 14px 0; }
+  .clicks .k { border-top:0; font-size:17px; } .clicks #bL { border-radius:0 0 0 14px; } .clicks #bR { border-radius:0 0 14px 0; }
   #p1 .col { display:grid; gap:8px; }
   #pad { border-radius:14px; border:1px solid #333; background:#0d0d0d radial-gradient(circle at 50% 50%, #161616, #0b0b0b); position:relative; touch-action:none; }
   #pad::after { content:"TRACKPAD · 1 doigt = souris · tape = clic · 2 doigts = défiler / clic droit"; position:absolute; bottom:8px; left:0; right:0; text-align:center; font-size:11px; color:#555; }
@@ -56,7 +56,7 @@
   .modeSw { position:absolute; top:8px; left:calc(50% - 75px); width:150px; height:44px; font-size:14px; }
   #p2b { grid-template-columns: 1fr 230px; gap:10px; }
   #gpad { border-radius:16px; border:1px solid #333; background:#0d0d0d radial-gradient(circle at 50% 50%, #171717, #0a0a0a); position:relative; touch-action:none; overflow:hidden; }
-  #gpad::before { content:"GLISSE = ▲ ▼ ◀ ▶  ·  RESTE APPUYÉ = DÉFILE  ·  TAPE = A  ·  2 DOIGTS = B"; position:absolute; bottom:10px; left:0; right:0; text-align:center; font-size:11px; color:#555; font-weight:700; }
+  #ghint { position:absolute; bottom:10px; left:0; right:0; text-align:center; font-size:11px; color:#555; font-weight:700; }
   #garrow { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:90px; color:#e10600; opacity:0; transition:opacity .25s; pointer-events:none; }
   .gcol { display:grid; gap:8px; grid-template-rows: 1.4fr 1fr .8fr .8fr .8fr .7fr; }
   .gcol .ga { font-size:30px; color:#21e05d; flex-direction:column; } .gcol .gb { font-size:24px; color:#ff4d42; flex-direction:column; }
@@ -109,7 +109,7 @@
 </div>
 <!-- manette a une main (telephone a plat, main droite) : glisser = fleches, tape = A -->
 <div class="page" id="p2b">
-  <div id="gpad"><div id="garrow"></div></div>
+  <div id="gpad"><div id="garrow"></div><div id="ghint"></div></div>
   <div class="gcol">
     <div class="k ga" data-b="A">A<small>valider</small></div>
     <div class="k gb" data-b="B">B<small>retour</small></div>
@@ -187,8 +187,8 @@ function padUp(e) { const p = touches.get(e.pointerId); if (!p) return; touches.
   else if (quick) { inp({ t: "click", b: "left" }); vib(); lastTap = performance.now(); }
 }
 pad.addEventListener("pointerup", padUp); pad.addEventListener("pointercancel", padUp);
-function holdBtn(el, b) { el.addEventListener("pointerdown", e => { el.setPointerCapture(e.pointerId); el.classList.add("down"); vib(); inp({ t: "btn", b, down: true }); });
-  const up = () => { if (!el.classList.contains("down")) return; el.classList.remove("down"); inp({ t: "btn", b, down: false }); };
+function holdBtn(el, b) { el.addEventListener("pointerdown", e => { el.setPointerCapture(e.pointerId); el.classList.add("down"); vib(30); inp({ t: "btn", b, down: true }); });
+  const up = () => { if (!el.classList.contains("down")) return; el.classList.remove("down"); vib(12); inp({ t: "btn", b, down: false }); };
   el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up); }
 holdBtn($("bL"), "left"); holdBtn($("bR"), "right");
 // bande de defilement
@@ -281,15 +281,19 @@ const GAME_MAPS = {
   "RaceRoom": { A: "ENTER", B: "ESC", START: "ESC" },
   "Assetto Corsa": { A: "ENTER", B: "ESC", START: "ESC" },
 };
-const LABELS = { "AC Rally": { X: "H · masquer IU", Y: "U · voir voiture" } };
+/* chaque bouton affiche la touche qu'il envoie (E, H, ENTRÉE...) */
+const KL = { ENTER: "ENTRÉE", ESC: "ÉCHAP", SPACE: "ESPACE", BACKSPACE: "⌫", TAB: "TAB", UP: "▲", DOWN: "▼", LEFT: "◀", RIGHT: "▶",
+  PGUP: "PG ↑", PGDN: "PG ↓", HOME: "DÉBUT", END: "FIN", DELETE: "SUPPR", INSERT: "INSER", LSHIFT: "MAJ", LCTRL: "CTRL", LALT: "ALT", LWIN: "WIN" };
+const keyLabel = k => String(k || "").split("+").map(x => KL[x] || x.replace(/^NUM/, "PAVÉ ")).join("+");
 function gameKey(g) { g = (g || "").toLowerCase(); return g.includes("rally") ? "AC Rally" : g.includes("acc") || g.includes("competizione") ? "ACC" :
   g.includes("mans") ? "Le Mans Ultimate" : g.includes("automobilista") ? "Automobilista 2" : g.includes("raceroom") ? "RaceRoom" : g.includes("assetto") ? "Assetto Corsa" : ""; }
 let GAME = "", MAP = {};
 function buildMap() {   // defaut < jeu < tes reglages pour ce jeu
   MAP = Object.assign({}, DEF_MAP, GAME_MAPS[GAME] || {}, JSON.parse(localStorage.getItem("padMap_" + (GAME || "def")) || localStorage.getItem(GAME ? "x" : "padMap") || "{}"));
+  const gh = $("ghint"); if (gh) gh.textContent = "GLISSE = ▲ ▼ ◀ ▶  ·  RESTE APPUYÉ = DÉFILE  ·  TAPE = " + keyLabel(MAP.A) + "  ·  2 DOIGTS = " + keyLabel(MAP.B);
   const lb = $("gameLbl"); if (lb) lb.textContent = GAME ? "🎮 touches de " + GAME : "🎮 touches par défaut";
-  document.querySelectorAll("#p2 [data-b], #p2b [data-b]").forEach(el => { const L = (LABELS[GAME] || {})[el.dataset.b];
-    let sm = el.querySelector("small.gl"); if (L) { if (!sm) { sm = document.createElement("small"); sm.className = "gl"; el.appendChild(sm); } sm.textContent = L; } else if (sm) sm.remove(); });
+  document.querySelectorAll("#p2 [data-b], #p2b [data-b]").forEach(el => { const t = keyLabel(MAP[el.dataset.b]);
+    el.textContent = t; el.style.fontSize = el.matches(".ga, .gb") ? "24px" : t.length > 6 ? "13px" : t.length > 3 ? "16px" : ""; });
 }
 async function watchGame() { try { const st = await (await fetch("api/state")).json(); const g = gameKey((st.frame || {}).game);
   if (g && g !== GAME) { GAME = g; buildMap(); } } catch (e) {} }

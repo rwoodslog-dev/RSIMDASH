@@ -2,6 +2,8 @@ package com.rsim33.rsim;
 
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.webkit.JavascriptInterface;
 import android.net.Uri;
 import android.os.Build;
@@ -29,6 +31,14 @@ public class MainActivity extends BridgeActivity {
                 final int v = "landscape-secondary".equals(o) ? ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
                         : "off".equals(o) ? ActivityInfo.SCREEN_ORIENTATION_SENSOR : ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
                 runOnUiThread(() -> setRequestedOrientation(v));
+            }
+
+            @JavascriptInterface
+            public void vibrate(int ms) {          // retour haptique des boutons (clics, button box...)
+                Vibrator vb = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+                if (vb == null) return;
+                if (Build.VERSION.SDK_INT >= 26) vb.vibrate(VibrationEffect.createOneShot(Math.max(1, ms), 255));
+                else vb.vibrate(ms);
             }
         }, "RSIMNative");
         route(getIntent(), 600);
