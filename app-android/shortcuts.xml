@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Raccourcis RSIM : appui long sur l'icone RSIM, puis glisser "Télécommande" sur l'écran d'accueil -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="remote" android:enabled="true" android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_remote" android:shortcutLongLabel="@string/sc_remote_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.rsim33.rsim"
+            android:targetClass="com.rsim33.rsim.MainActivity" android:data="rsim://remote" />
+    </shortcut>
+    <shortcut android:shortcutId="dash" android:enabled="true" android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/sc_dash" android:shortcutLongLabel="@string/sc_dash">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="com.rsim33.rsim"
+            android:targetClass="com.rsim33.rsim.MainActivity" android:data="rsim://dash" />
+    </shortcut>
+</shortcuts>
