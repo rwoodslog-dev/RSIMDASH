@@ -7,7 +7,7 @@
 (function () {
   /* vibration : passe par l'appli Android (plus fiable que navigator.vibrate dans l'APK) */
   if (window.RSIMNative && window.RSIMNative.vibrate) {
-    try { navigator.vibrate = p => { const ms = Array.isArray(p) ? p[0] : p; if (ms > 0) window.RSIMNative.vibrate(Math.round(ms)); return true; }; } catch (e) {}
+    try { navigator.vibrate = p => { try { const ms = Array.isArray(p) ? p[0] : p; if (ms > 0) window.RSIMNative.vibrate(Math.round(ms)); } catch (e) {} return true; }; } catch (e) {}
   }
   const saved = (localStorage.getItem("rsimPC") || "").trim();
   const norm = u => u ? (/^https?:\/\//i.test(u) ? u : "http://" + u).replace(/\/?$/, "/") : "";

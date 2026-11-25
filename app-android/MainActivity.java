@@ -35,10 +35,17 @@ public class MainActivity extends BridgeActivity {
 
             @JavascriptInterface
             public void vibrate(int ms) {          // retour haptique des boutons (clics, button box...)
-                Vibrator vb = (Vibrator) getSystemService(VIBRATOR_SERVICE);
-                if (vb == null) return;
-                if (Build.VERSION.SDK_INT >= 26) vb.vibrate(VibrationEffect.createOneShot(Math.max(1, ms), 255));
-                else vb.vibrate(ms);
+                try {
+                    Vibrator vb = (Vibrator) getSystemService(VIBRATOR_SERVICE);
+                    if (vb != null && vb.hasVibrator()) {
+                        if (Build.VERSION.SDK_INT >= 26) vb.vibrate(VibrationEffect.createOneShot(Math.max(1, ms), 255));
+                        else vb.vibrate(ms);
+                        return;
+                    }
+                } catch (Exception e) { /* pas d'autorisation : on passe au retour haptique systeme */ }
+                runOnUiThread(() -> {
+                    try { getBridge().getWebView().performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY); } catch (Exception e) { }
+                });
             }
         }, "RSIMNative");
         route(getIntent(), 600);

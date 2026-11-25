@@ -134,7 +134,7 @@ const inp = b => post("api/input", b);
 function toast(m) { let t = $("toastR"); if (!t) { t = document.createElement("div"); t.id = "toastR";
   t.style.cssText = "position:fixed;bottom:14px;left:50%;transform:translateX(-50%);background:#e10600;color:#fff;padding:8px 16px;font:italic 900 14px 'Titillium Web',sans-serif;z-index:20;text-transform:uppercase";
   document.body.appendChild(t); } t.textContent = m; t.style.display = "block"; clearTimeout(t.h); t.h = setTimeout(() => t.style.display = "none", 1800); }
-const vib = ms => navigator.vibrate && navigator.vibrate(ms || 12);
+const vib = ms => { try { navigator.vibrate && navigator.vibrate(ms || 12); } catch (e) {} };   // une vibration qui echoue ne bloque jamais un bouton
 
 /* onglets + paysage verrouille */
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
@@ -187,8 +187,8 @@ function padUp(e) { const p = touches.get(e.pointerId); if (!p) return; touches.
   else if (quick) { inp({ t: "click", b: "left" }); vib(); lastTap = performance.now(); }
 }
 pad.addEventListener("pointerup", padUp); pad.addEventListener("pointercancel", padUp);
-function holdBtn(el, b) { el.addEventListener("pointerdown", e => { el.setPointerCapture(e.pointerId); el.classList.add("down"); vib(30); inp({ t: "btn", b, down: true }); });
-  const up = () => { if (!el.classList.contains("down")) return; el.classList.remove("down"); vib(12); inp({ t: "btn", b, down: false }); };
+function holdBtn(el, b) { el.addEventListener("pointerdown", e => { el.setPointerCapture(e.pointerId); el.classList.add("down"); inp({ t: "btn", b, down: true }); vib(30); });
+  const up = () => { if (!el.classList.contains("down")) return; el.classList.remove("down"); inp({ t: "btn", b, down: false }); vib(12); };
   el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up); }
 holdBtn($("bL"), "left"); holdBtn($("bR"), "right");
 // bande de defilement
