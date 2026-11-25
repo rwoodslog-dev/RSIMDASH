@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e12">
+<link rel="icon" href="icon-192.png">
+<title>RSIM · Vidéos</title>
+<style>
+  :root { --bg:#0b0e12; --p:#11161d; --p2:#161c24; --b:#232c37; --t:#e6edf3; --m:#8fa3b5; --a:#3fd0ff; --r:#ff3b30; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--t); font:14px/1.4 "Segoe UI", Roboto, sans-serif; }
+  header { display:flex; align-items:center; gap:10px; padding:12px 18px; background:var(--p); border-bottom:1px solid var(--b); flex-wrap:wrap; }
+  header a { color:var(--a); text-decoration:none; font-weight:600; } header h1 { margin:0; font-size:18px; }
+  input, select, button { font:inherit; color:var(--t); background:var(--p2); border:1px solid var(--b); border-radius:8px; padding:6px 10px; }
+  button { cursor:pointer; } .pri { background:#1d6fe0; border-color:#1d6fe0; } .dan { color:#ff8a80; }
+  .rec { background:#8a1010; border-color:#c62828; font-weight:700; } .rec.on { background:#ff2a2a; animation: bl 1s infinite; }
+  @keyframes bl { 50% { opacity:.6 } }
+  .bufon { background:#145c33; border-color:#21e05d; }
+  .pill { padding:4px 10px; border-radius:20px; background:var(--p2); border:1px solid var(--b); font-size:13px; color:var(--m); }
+  main { padding:14px 18px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap:12px; }
+  .vc { background:var(--p); border:1px solid var(--b); border-radius:10px; overflow:hidden; cursor:pointer; }
+  .vc:hover { border-color:var(--a); }
+  .vc img, .vc .noimg { width:100%; aspect-ratio:16/9; object-fit:cover; display:block; background:#000; }
+  .vc .i { padding:8px 10px; } .vc small { color:var(--m); display:block; }
+  .tag { font-size:11px; padding:1px 6px; border-radius:5px; background:#1d3b5c; color:#9fd3ff; margin-left:4px; } .tag.clip { background:#3b2a07; color:#ffcf70; }
+  #player { display:none; }
+  .pl { display:grid; grid-template-columns: minmax(0, 1fr) 300px; gap:14px; }
+  @media (max-width:1100px) { .pl { grid-template-columns: 1fr; } }
+  .vw { position:relative; background:#000; border-radius:10px; overflow:hidden; }
+  .vw video { width:100%; display:block; }
+  .vw canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  #strip { width:100%; height:120px; display:block; background:var(--p); border:1px solid var(--b); border-radius:10px; margin-top:8px; cursor:pointer; }
+  .panel { background:var(--p); border:1px solid var(--b); border-radius:10px; padding:12px; display:grid; gap:10px; align-content:start; }
+  .panel label { color:var(--m); font-size:12px; display:block; margin-bottom:3px; }
+  .panel select, .panel input:not([type=checkbox]) { width:100%; }
+  #cfg { display:none; margin-bottom:14px; }
+  .cfgg { display:grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap:12px; }
+  .hint { color:var(--m); font-size:13px; } .err { color:#ff8a80; font-size:13px; white-space:pre-wrap; }
+  .toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#1d6fe0; padding:8px 16px; border-radius:8px; display:none; z-index:9; }
+  progress { width:100%; }
+</style>
+</head>
+<body>
+<header>
+  <a href="index.html">← Accueil</a><h1>Vidéos</h1>
+  <button class="rec" id="bRec">● Enregistrer</button>
+  <button id="bBuf">Replay : OFF</button>
+  <button id="bClip">💾 Sauver le replay</button>
+  <span class="pill" id="st">…</span>
+  <button id="bCfg" style="margin-left:auto">⚙ Réglages capture</button>
+</header>
+<main>
+  <div class="panel" id="cfg">
+    <div id="ffInfo"></div>
+    <div class="cfgg">
+      <div><label>Méthode de capture</label><select id="cPipe"></select><button id="bProbe" style="margin-top:6px">Tester les méthodes</button><div class="hint" id="probe"></div></div>
+      <div><label>Images / seconde</label><select id="cFps"><option>30</option><option>60</option><option>120</option></select></div>
+      <div><label>Débit vidéo (Mbit/s) — 40 = très bonne qualité 1080p</label><input type="number" id="cBr" min="5" max="150"></div>
+      <div><label>Écran capturé (0 = principal)</label><input type="number" id="cMon" min="0" max="5"></div>
+      <div><label>Son (périphérique d'enregistrement)</label><select id="cAudio"></select>
+        <div class="hint">Pour le son du jeu : active « Mixage stéréo » dans les réglages son de Windows.</div></div>
+      <div><label>Durée du replay (secondes)</label><input type="number" id="cBuf" min="10" max="600"></div>
+      <div><label><input type="checkbox" id="cAuto"> Replay activé au lancement de RSIM</label></div>
+      <div><label>Raccourci : vidéo marche / arrêt</label><input id="cHR"></div>
+      <div><label>Raccourci : sauver le replay</label><input id="cHC"></div>
+      <div><label>Raccourci : replay on / off</label><input id="cHB"></div>
+    </div>
+    <div><button class="pri" id="bCfgSave">Enregistrer les réglages</button> <button id="bDiag">🩺 Diagnostic capture</button></div>
+    <pre class="err" id="diag" style="display:none;background:#0c1015;border:1px solid var(--b);border-radius:8px;padding:10px;max-height:340px;overflow:auto"></pre>
+    <div class="err" id="log"></div>
+  </div>
+
+  <div id="player">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <button id="bBack">← Toutes les vidéos</button><b id="pTitle"></b>
+    </div>
+    <div class="pl">
+      <div>
+        <div class="vw"><video id="vid" controls playsinline crossorigin="anonymous"></video><canvas id="ov"></canvas></div>
+        <canvas id="strip"></canvas>
+      </div>
+      <div class="panel">
+        <div><label>Overlay télémétrie</label><select id="oStyle">
+          <option value="dash">Mini dash (coin)</option><option value="band">Bandeau bas</option><option value="pedals">Pédales + volant</option><option value="none">Aucun</option></select></div>
+        <div><label>Synchro vidéo / télémétrie : <b id="offV">0.00 s</b></label><input type="range" id="off" min="-3" max="3" step="0.05" value="0"></div>
+        <button id="bExp">🎬 Exporter avec l'overlay</button><progress id="expP" max="1" value="0" hidden></progress>
+        <a id="bDl" class="hint">⬇ Télécharger la vidéo d'origine (.mp4)</a>
+        <button class="dan" id="bDel">Supprimer la vidéo</button>
+        <div class="hint" id="pInfo"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="lib"><div class="grid" id="grid"></div></div>
+</main>
+<div class="toast" id="toast"></div>
+<script src="api.js"></script>
+<script>
+"use strict";
+if (RSIMAPI.needsSetup) location.href = "settings.html?first=1";
+const $ = id => document.getElementById(id);
+const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 2500); };
+const post = (u, b) => fetch(u, { method: "POST", body: JSON.stringify(b || {}) }).then(r => r.json());
+const media = f => RSIMAPI.url("media/" + encodeURIComponent(f));
+const fmt = t => t == null ? "—" : Math.floor(t / 60) + ":" + (t % 60).toFixed(3).padStart(6, "0");
+const mmss = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+let ST = {}, VIDS = [], cur = null, info = null;
+
+/* ---------------- capture ---------------- */
+const act = a => post("api/action", { action: a }).then(() => setTimeout(status, 400));
+$("bRec").onclick = () => act("rec_toggle");
+$("bBuf").onclick = () => act("buffer_toggle");
+$("bClip").onclick = () => { act("clip"); toast("Sauvegarde du replay…"); };
+let lastFile = null;
+async function status() {
+  ST = await (await fetch("api/capture")).json();
+  $("bRec").classList.toggle("on", ST.recording); $("bRec").textContent = ST.recording ? "■ Arrêter (" + mmss(ST.recFor) + ")" : "● Enregistrer";
+  $("bBuf").classList.toggle("bufon", ST.buffering); $("bBuf").textContent = "Replay : " + (ST.buffering ? "ON (" + ST.bufferSec + " s)" : "OFF");
+  $("bClip").disabled = !ST.buffering;
+  $("st").textContent = !ST.ffmpeg ? "⚠ ffmpeg absent : ouvre ⚙ Réglages capture" : ST.error ? "⚠ " + ST.error.slice(0, 140) : ST.recording ? "Enregistrement…" : ST.buffering ? "Replay prêt" : "Prêt";
+  $("st").title = ST.error || "";
+  $("log").textContent = ST.error ? ST.error + "\n" + (ST.log || []).join("\n") : "";
+  if (ST.lastFile !== lastFile) { if (lastFile !== null) loadLib(); lastFile = ST.lastFile; }
+}
+function fillCfg() {
+  const c = ST.cfg;
+  $("ffInfo").innerHTML = ST.ffmpeg ? `<span class="hint">ffmpeg : ${ST.ffmpeg}</span>`
+    : `<b style="color:#ff8a80">ffmpeg.exe introuvable.</b> <span class="hint">Télécharge « ffmpeg-release-essentials.zip » sur gyan.dev, et copie <b>bin\\ffmpeg.exe</b> dans le dossier RSIM (à côté de server.py), puis relance RSIM.</span>`;
+  $("cPipe").innerHTML = `<option value="auto">Automatique (la meilleure qui marche)</option>` + ST.pipes.map(p => `<option value="${p.id}">${p.label}</option>`).join("");
+  $("cPipe").value = c.pipeline; $("cFps").value = c.fps; $("cBr").value = c.bitrate; $("cMon").value = c.monitor; $("cBuf").value = c.bufferSec;
+  $("cAuto").checked = c.autoBuffer; $("cHR").value = c.hotRec; $("cHC").value = c.hotClip; $("cHB").value = c.hotBuf;
+  $("probe").textContent = ST.probe ? "Fonctionnent : " + (ST.probe.map(id => (ST.pipes.find(p => p.id === id) || {}).label || id).join(" · ") || "aucune") : "";
+  fetch("api/capture/audio").then(r => r.json()).then(list => {
+    $("cAudio").innerHTML = '<option value="">Pas de son</option>' + list.map(a => `<option>${a}</option>`).join("") + (c.audio && !list.includes(c.audio) ? `<option>${c.audio}</option>` : "");
+    $("cAudio").value = c.audio; });
+}
+$("bCfg").onclick = () => { const p = $("cfg"); p.style.display = p.style.display === "grid" ? "none" : "grid"; if (p.style.display === "grid") fillCfg(); };
+$("bDiag").onclick = async () => {
+  const d = $("diag"); d.style.display = "block"; d.textContent = "Diagnostic en cours (jusqu'à 1 minute)…";
+  try { const r = await (await fetch("api/capture/diag")).json(); d.textContent = JSON.stringify(r, null, 2); }
+  catch (e) { d.textContent = "Le PC ne répond pas : " + e; }
+};
+$("bProbe").onclick = async () => { $("probe").textContent = "Test en cours (quelques secondes)…"; await fetch("api/capture/probe"); await status(); fillCfg(); };
+$("bCfgSave").onclick = async () => {
+  ST = await post("api/capture/config", { pipeline: $("cPipe").value, fps: +$("cFps").value, bitrate: +$("cBr").value, monitor: +$("cMon").value,
+    audio: $("cAudio").value, bufferSec: +$("cBuf").value, autoBuffer: $("cAuto").checked, hotRec: $("cHR").value.toUpperCase(),
+    hotClip: $("cHC").value.toUpperCase(), hotBuf: $("cHB").value.toUpperCase() });
+  toast("Réglages enregistrés (le replay redémarre au prochain lancement)"); status();
+};
+
+/* ---------------- bibliotheque ---------------- */
+async function loadLib() {
+  VIDS = await (await fetch("api/videos")).json();
+  const g = $("grid"); g.innerHTML = VIDS.length ? "" : '<p class="hint">Aucune vidéo. Clique « ● Enregistrer » (ou Ctrl+Alt+R en jeu), ou active le replay puis « Sauver le replay » (Ctrl+Alt+C).</p>';
+  VIDS.forEach(v => {
+    const el = document.createElement("div"); el.className = "vc"; const d = new Date((v.start || v.mtime) * 1000);
+    el.innerHTML = `${v.thumb ? `<img loading="lazy" src="${media(v.file.replace(/\.mp4$/, ".jpg"))}">` : '<div class="noimg"></div>'}
+      <div class="i"><b>${v.car || v.game || v.file}</b><span class="tag ${v.kind === "clip" ? "clip" : ""}">${v.kind === "clip" ? "replay" : "vidéo"}</span>
+      ${v.recording ? '<span class="tag" style="background:#5c1010;color:#ff9a9a">● en cours</span>' : ""}
+      <small>${v.track || v.game || ""} · ${d.toLocaleDateString()} ${d.toLocaleTimeString().slice(0, 5)} · ${v.duration ? mmss(v.duration) : "?"} · ${(v.size / 1e6).toFixed(0)} Mo</small></div>`;
+    if (!v.recording) el.onclick = () => openVid(v.file);
+    g.appendChild(el);
+  });
+}
+
+/* ---------------- lecteur ---------------- */
+const vid = $("vid"), ov = $("ov"), octx = ov.getContext("2d");
+async function openVid(f) {
+  cur = VIDS.find(v => v.file === f); info = await (await fetch("api/video?f=" + encodeURIComponent(f))).json();
+  info.tele = info.tele || [];
+  $("lib").style.display = "none"; $("player").style.display = "block";
+  $("pTitle").textContent = (info.car || f) + (info.track ? " · " + info.track : "");
+  vid.src = media(f); $("bDl").href = media(f) + "?dl=1";
+  $("off").value = info.offset || 0; $("offV").textContent = (+$("off").value).toFixed(2) + " s";
+  const laps = [...new Set(info.tele.map(x => x[1].lap))].length;
+  $("pInfo").innerHTML = `${info.game || ""}<br>${info.tele.length} points de télémétrie (${(info.tele.length / Math.max(1, info.duration)).toFixed(0)} / s) · ${laps} tour(s)<br>
+    Décale la synchro si l'overlay est en avance / en retard sur l'image.`;
+  drawStrip();
+}
+$("bBack").onclick = () => { vid.pause(); vid.removeAttribute("src"); vid.load(); $("player").style.display = "none"; $("lib").style.display = "block"; cur = info = null; };
+$("off").oninput = () => { $("offV").textContent = (+$("off").value).toFixed(2) + " s"; info.offset = +$("off").value; drawStrip(); };
+$("off").onchange = () => post("api/video/offset", { f: cur.file, offset: +$("off").value });
+$("bDel").onclick = async () => { if (!confirm("Supprimer cette vidéo et sa télémétrie ?")) return; await post("api/video/delete", { f: cur.file }); $("bBack").onclick(); loadLib(); };
+
+// telemetrie a l'instant t (interpolee)
+const NUM = ["rpm", "speed", "throttle", "brake", "clutch", "steer", "cur", "delta", "fuel", "lapPct"];
+function teleAt(t) {
+  const T = info && info.tele; if (!T || !T.length) return null;
+  t += info.offset || 0;
+  let lo = 0, hi = T.length - 1;
+  if (t <= T[0][0]) return T[0][1]; if (t >= T[hi][0]) return T[hi][1];
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (T[m][0] <= t) lo = m; else hi = m; }
+  const a = T[lo], b = T[hi], f = (t - a[0]) / Math.max(1e-6, b[0] - a[0]), o = Object.assign({}, f < 0.5 ? a[1] : b[1]);
+  for (const k of NUM) if (a[1][k] != null && b[1][k] != null && !(k === "cur" && b[1][k] < a[1][k])) o[k] = a[1][k] + (b[1][k] - a[1][k]) * f;
+  return o;
+}
+function rr(c, x, y, w, h, r) { c.beginPath(); c.roundRect(x, y, w, h, r); }
+function txt(c, s, x, y, size, col, align, weight) { c.font = (weight || 700) + " " + size + "px Rajdhani, 'Roboto Condensed', Roboto, sans-serif"; c.fillStyle = col; c.textAlign = align || "left"; c.textBaseline = "middle"; c.fillText(s, x, y); }
+function wheel(c, x, y, r, steer) {
+  c.save(); c.translate(x, y); c.rotate((steer || 0) * Math.PI * 1.25);
+  c.lineWidth = r * 0.22; c.strokeStyle = "#e8e8e8"; c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.stroke();
+  c.lineWidth = r * 0.18; c.beginPath(); c.moveTo(-r, 0); c.lineTo(r, 0); c.moveTo(0, 0); c.lineTo(0, r); c.stroke();
+  c.fillStyle = "#ff3b30"; c.fillRect(-r * 0.08, -r * 1.12, r * 0.16, r * 0.26); c.restore();
+}
+function pedBar(c, x, y, w, h, v, col) { c.fillStyle = "rgba(255,255,255,0.12)"; rr(c, x, y, w, h, 6); c.fill(); c.fillStyle = col; const hh = h * Math.max(0, Math.min(1, v || 0)); rr(c, x, y + h - hh, w, hh, 6); c.fill(); }
+// overlay dessine dans un repere 1920x1080
+function drawOverlay(c, W, H, d, style) {
+  c.clearRect(0, 0, W, H); if (!d || style === "none") return;
+  c.save(); c.scale(W / 1920, H / 1080);
+  const gear = d.gear == null ? "" : d.gear < 0 ? "R" : d.gear === 0 ? "N" : String(d.gear), fr = d.maxRpm ? Math.min(1, d.rpm / d.maxRpm) : 0;
+  const ledCol = fr > 0.94 ? "#ff2a2a" : fr > 0.85 ? "#ffcc00" : "#21e05d";
+  if (style === "dash") {
+    const x = 1440, y = 760, w = 450, h = 290;
+    c.fillStyle = "rgba(8,10,14,0.78)"; rr(c, x, y, w, h, 22); c.fill();
+    for (let i = 0; i < 12; i++) { const on = fr > 0.6 + i * 0.033; c.fillStyle = on ? (i < 5 ? "#21e05d" : i < 9 ? "#ffcc00" : "#ff2a2a") : "rgba(255,255,255,0.1)";
+      c.beginPath(); c.arc(x + 40 + i * 34, y + 30, 11, 0, Math.PI * 2); c.fill(); }
+    txt(c, gear, x + 95, y + 140, 150, fr > 0.94 ? "#ff3b30" : "#fff", "center");
+    txt(c, Math.round(d.speed || 0), x + 290, y + 110, 76, "#fff", "center"); txt(c, "km/h", x + 290, y + 160, 26, "#9aa3ad", "center", 500);
+    pedBar(c, x + 395, y + 60, 18, 150, d.clutch, "#3fd0ff"); pedBar(c, x + 420, y + 60, 18, 150, d.brake, "#ff3b30"); pedBar(c, x + 370, y + 60, 18, 150, d.throttle, "#21e05d");
+    txt(c, fmt(d.cur), x + 30, y + 245, 40, "#fff", "left");
+    if (d.delta != null) txt(c, (d.delta > 0 ? "+" : "") + d.delta.toFixed(2), x + 420, y + 245, 40, d.delta > 0 ? "#ff5a4f" : "#21e05d", "right");
+  } else if (style === "band") {
+    const y = 960; c.fillStyle = "rgba(8,10,14,0.8)"; c.fillRect(0, y, 1920, 120);
+    c.fillStyle = "rgba(255,255,255,0.12)"; c.fillRect(0, y, 1920, 10); c.fillStyle = ledCol; c.fillRect(0, y, 1920 * fr, 10);
+    txt(c, gear, 80, y + 66, 92, "#fff", "center"); txt(c, Math.round(d.speed || 0) + " km/h", 170, y + 66, 58, "#fff");
+    pedBar(c, 470, y + 25, 26, 80, d.throttle, "#21e05d"); pedBar(c, 505, y + 25, 26, 80, d.brake, "#ff3b30");
+    wheel(c, 600, y + 65, 34, d.steer);
+    txt(c, "TOUR " + (d.lap || "-") + "   P" + (d.pos || "-"), 700, y + 66, 44, "#9fd3ff");
+    txt(c, fmt(d.cur), 1060, y + 66, 58, "#fff"); txt(c, "MEILLEUR " + fmt(d.best), 1340, y + 66, 38, "#c58bff");
+    if (d.delta != null) txt(c, (d.delta > 0 ? "+" : "") + d.delta.toFixed(2), 1880, y + 66, 58, d.delta > 0 ? "#ff5a4f" : "#21e05d", "right");
+  } else if (style === "pedals") {
+    const x = 1620, y = 760; c.fillStyle = "rgba(8,10,14,0.75)"; rr(c, x, y, 270, 290, 22); c.fill();
+    wheel(c, x + 135, y + 85, 55, d.steer);
+    pedBar(c, x + 55, y + 165, 40, 105, d.clutch, "#3fd0ff"); pedBar(c, x + 115, y + 165, 40, 105, d.brake, "#ff3b30"); pedBar(c, x + 175, y + 165, 40, 105, d.throttle, "#21e05d");
+  }
+  c.restore();
+}
+function sizeOv() { const r = vid.getBoundingClientRect(); const dpr = devicePixelRatio || 1;
+  if (ov.width !== Math.round(r.width * dpr)) { ov.width = Math.round(r.width * dpr); ov.height = Math.round(r.height * dpr); } }
+function loop() {
+  if (info) { sizeOv(); drawOverlay(octx, ov.width, ov.height, teleAt(vid.currentTime), $("oStyle").value); drawStripHead(); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// bande telemetrie sous la video (vitesse + gaz/frein) ; clic = aller a l'instant
+const sc = $("strip"), sctx = sc.getContext("2d"); let stripImg = null;
+function drawStrip() {
+  const dpr = devicePixelRatio || 1, W = sc.clientWidth * dpr, H = sc.clientHeight * dpr; sc.width = W; sc.height = H;
+  const T = info.tele, dur = vid.duration || info.duration || 1; sctx.clearRect(0, 0, W, H);
+  if (!T.length) { stripImg = null; return; }
+  const mx = Math.max(50, ...T.map(x => x[1].speed || 0)), X = t => (t - (info.offset || 0)) / dur * W;
+  const line = (k, col, sy, sh, scale) => { sctx.strokeStyle = col; sctx.lineWidth = 1.5 * dpr; sctx.beginPath();
+    T.forEach(([t, d], i) => { const x = X(t), y = sy + sh - (d[k] || 0) / scale * sh; i ? sctx.lineTo(x, y) : sctx.moveTo(x, y); }); sctx.stroke(); };
+  line("throttle", "rgba(33,224,93,.8)", H * 0.62, H * 0.34, 1); line("brake", "rgba(255,59,48,.9)", H * 0.62, H * 0.34, 1);
+  line("speed", "#3fd0ff", H * 0.06, H * 0.52, mx);
+  stripImg = sctx.getImageData(0, 0, W, H);
+}
+function drawStripHead() {
+  if (!stripImg) return; sctx.putImageData(stripImg, 0, 0);
+  const x = vid.currentTime / (vid.duration || info.duration || 1) * sc.width; sctx.fillStyle = "#fff"; sctx.fillRect(x - 1, 0, 2, sc.height);
+}
+sc.onclick = e => { const r = sc.getBoundingClientRect(); vid.currentTime = (e.clientX - r.left) / r.width * (vid.duration || info.duration); };
+vid.addEventListener("loadedmetadata", drawStrip);
+addEventListener("resize", () => info && drawStrip());
+
+// export : video + overlay grave dedans (enregistrement en temps reel par le navigateur)
+$("bExp").onclick = async () => {
+  if (!vid.videoWidth) return toast("Vidéo pas encore chargée");
+  const W = vid.videoWidth, H = vid.videoHeight, cv = document.createElement("canvas"); cv.width = W; cv.height = H; const c = cv.getContext("2d");
+  const oc = document.createElement("canvas"); oc.width = W; oc.height = H; const o = oc.getContext("2d");
+  const stream = cv.captureStream(info.fps || 60);
+  try { (vid.captureStream || vid.mozCaptureStream).call(vid).getAudioTracks().forEach(t => stream.addTrack(t)); } catch (e) {}
+  const types = ["video/mp4;codecs=avc1.640028,mp4a.40.2", "video/mp4;codecs=avc1", "video/webm;codecs=vp9,opus", "video/webm"];
+  const type = types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)); if (!type) return toast("Export non supporté par ce navigateur");
+  const recd = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: (ST.cfg && ST.cfg.bitrate || 30) * 1e6 }), chunks = [];
+  recd.ondataavailable = e => e.data.size && chunks.push(e.data);
+  const style = $("oStyle").value === "none" ? "dash" : $("oStyle").value, p = $("expP"); p.hidden = false; $("bExp").disabled = true;
+  let run = true;
+  const draw = () => { if (!run) return; c.drawImage(vid, 0, 0, W, H); drawOverlay(o, W, H, teleAt(vid.currentTime), style); c.drawImage(oc, 0, 0);
+    p.value = vid.currentTime / vid.duration; vid.requestVideoFrameCallback ? vid.requestVideoFrameCallback(draw) : requestAnimationFrame(draw); };
+  vid.pause(); vid.currentTime = 0; await new Promise(r => vid.onseeked = r); vid.onseeked = null;
+  recd.start(500); vid.play(); draw(); toast("Export en cours : laisse la vidéo jouer jusqu'au bout");
+  await new Promise(r => vid.onended = r); vid.onended = null; run = false; recd.stop();
+  await new Promise(r => recd.onstop = r);
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(chunks, { type }));
+  a.download = cur.file.replace(/\.mp4$/, "") + "_overlay." + (type.includes("mp4") ? "mp4" : "webm"); a.click();
+  p.hidden = true; $("bExp").disabled = false; toast("Export terminé");
+};
+
+status().then(loadLib); setInterval(status, 1000);
+const q = new URLSearchParams(location.search).get("v"); if (q) setTimeout(() => openVid(q), 600);
+</script>
+</body>
+</html>

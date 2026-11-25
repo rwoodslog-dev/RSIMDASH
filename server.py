@@ -15,6 +15,10 @@ import re
 
 import inputs
 import telemetry
+import recorder
+import ffb
+import capture
+import hotkeys
 
 BASE = os.path.dirname(os.path.abspath(sys.argv[0] if getattr(sys, "frozen", False) else __file__))
 WEB = os.path.join(BASE, "web")
@@ -50,7 +54,7 @@ class State:
         self.frame = {"connected": False}
         self.demo = telemetry.Demo() if demo else None
         self.fuel_lap = {"lap": None, "fuel": None, "avg": 0.0}
-        self.ui = {"page": 0, "override": None, "lastProfile": None}
+        self.ui = {"page": 0, "override": None, "lastProfile": None, "lastAuto": None}
         self.binds = load_json(BINDS, [])            # [{dev, btn, action, devName}]
         self.dash_rev = 0
         self.joy = None
@@ -58,6 +62,11 @@ class State:
         os.makedirs(DASH_DIR, exist_ok=True)
         self.dashes = {}
         self.load_dashes()
+        self.ring = recorder.Ring(300)                                   # 5 min de telemetrie pour les videos
+        self.laps = recorder.LapRecorder(os.path.join(BASE, "telemetry"))
+        self.ffb = ffb.FFBStore(os.path.join(BASE, "ffb_profiles.json"))
+        self.cap = None
+        self.hk = None
 
     # ---- dashboards personnalises (dossier dashboards/)
     def load_dashes(self):
@@ -103,7 +112,7 @@ class State:
     # ---- actions (boutons du volant / boutons du telephone)
     def action(self, act):
         act = (act or "").strip()
-        cur = self.frame.get("profile") if self.frame.get("connected") else self.ui["lastProfile"]
+        cur = self.frame.get("profile") if self.frame.get("connected") else (self.ui["override"] or self.ui["lastProfile"])
         ids = [x["id"] for x in self.all_profiles()]
         if act == "page_next":
             self.ui["page"] = (self.ui["page"] + 1) % self.pages_of(cur)
@@ -119,6 +128,8 @@ class State:
             self.ui["override"], self.ui["page"] = act[5:], 0
         elif act.startswith("page:"):
             self.ui["page"] = max(0, int(act[5:]) - 1) % self.pages_of(cur)
+        elif act in ("rec_toggle", "rec_start", "rec_stop", "clip", "buffer_toggle") and self.cap:
+            threading.Thread(target=getattr(self.cap, act), daemon=True).start()   # ne bloque pas le bouton
         elif act.startswith("key:"):
             inputs.send_keys(act[4:])
         elif act.startswith("keydown:"):
@@ -129,6 +140,11 @@ class State:
             return False
         print("  > action :", act)
         return True
+
+    def apply_hotkeys(self):
+        if self.hk and self.cap:
+            c = self.cap.cfg
+            self.hk.set({"rec_toggle": c.get("hotRec"), "clip": c.get("hotClip"), "buffer_toggle": c.get("hotBuf")})
 
     def on_button(self, dev, btn):
         for b in self.binds:
@@ -182,19 +198,35 @@ class State:
         return fl["avg"]
 
     def publish(self, d):
-        if d is None:
+        if d is None:   # pas de jeu : on garde le dernier dash affiche (le telephone le montre en attente)
             with self.lock:
-                self.frame = {"connected": False}
+                self.frame = {"connected": False, "profile": self.ui["override"] or self.ui["lastProfile"], "page": self.ui["page"],
+                              "dashRev": self.dash_rev, "autoProfile": self.ui.get("lastAuto")}
+                if self.cap:
+                    r = self.cap.small()
+                    self.frame.update(rec=r, recOn=int(r["on"]), bufOn=int(r["buf"]))
+            self.laps.idle()
             return
         prof, how = self.resolve(d["game"], d["car"], d["carClass"])
-        d["autoProfile"] = self.resolve(d["game"], d["car"], d["carClass"], no_multi=True)[0]
+        d["autoProfile"] = self.ui["lastAuto"] = self.resolve(d["game"], d["car"], d["carClass"], no_multi=True)[0]
         if self.ui["override"]:
             prof, how = self.ui["override"], "bouton"
         if prof != self.ui["lastProfile"]:
             self.ui["page"], self.ui["lastProfile"] = 0, prof
         d["fuelPerLap"] = self.fuel_avg(d)
         d["fuelLaps"] = d["fuel"] / d["fuelPerLap"] if d["fuelPerLap"] > 0 else None
-        d.update(connected=True, profile=prof, how=how, ts=time.time(), page=self.ui["page"], dashRev=self.dash_rev)
+        now = time.time()
+        d.update(connected=True, profile=prof, how=how, ts=now, page=self.ui["page"], dashRev=self.dash_rev)
+        self.ring.feed(d, now)
+        try:
+            self.laps.feed(d, now)
+        except Exception as e:
+            print("  ! Enregistrement tour :", e)
+        if self.cap:
+            r = self.cap.small()
+            d["rec"], d["recOn"], d["bufOn"] = r, int(r["on"]), int(r["buf"])
+        fp = self.ffb.match(d["game"], d["car"], d["carClass"])
+        d["ffbProfile"] = fp["name"] if fp else None
         with self.lock:
             self.frame = d
         self.remember(d["game"], d["car"], d["carClass"])
@@ -236,7 +268,7 @@ def source_loop(st):
 
 MIME = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
         ".css": "text/css", ".json": "application/json", ".png": "image/png", ".svg": "image/svg+xml",
-        ".woff2": "font/woff2", ".webmanifest": "application/manifest+json"}
+        ".woff2": "font/woff2", ".mp4": "video/mp4", ".jpg": "image/jpeg", ".webmanifest": "application/manifest+json"}
 
 
 def make_handler(st):
@@ -313,6 +345,36 @@ def make_handler(st):
                                        "assign": st.assign, "demo": st.demo is not None, "phoneUrl": st.phone_url})
             if p == "/api/stream":
                 return self.stream()
+            # ---- telemetrie (tours)
+            if p == "/api/tele/sessions":
+                return self.send(200, st.laps.sessions())
+            if p == "/api/tele/lap":
+                lap = st.laps.lap(qv(q, "s"), qv(q, "f"))
+                return self.send(200 if lap else 404, lap or {"error": "introuvable"})
+            # ---- profils FFB
+            if p == "/api/ffb":
+                return self.send(200, dict(st.ffb.meta(), profiles=st.ffb.profiles))
+            if p == "/api/ffb/current":
+                f = st.frame
+                m = st.ffb.match(f.get("game"), f.get("car"), f.get("carClass", "")) if f.get("connected") else None
+                return self.send(200, {"profile": m, "game": f.get("game"), "car": f.get("car")})
+            # ---- videos
+            if p == "/api/capture":
+                return self.send(200, st.cap.status())
+            if p == "/api/capture/audio":
+                return self.send(200, st.cap.audio_devices())
+            if p == "/api/capture/diag":
+                return self.send(200, st.cap.diag())
+            if p == "/api/capture/probe":
+                return self.send(200, st.cap.probe(force=True))
+            if p == "/api/videos":
+                return self.send(200, st.cap.list())
+            if p == "/api/video":
+                path = st.cap.safe(qv(q, "f"))
+                j = os.path.splitext(path)[0] + ".json" if path else ""
+                return self.send(200, load_json(j, {})) if j and os.path.isfile(j) else self.send(404, {"error": "?"})
+            if p.startswith("/media/"):
+                return self.media(p[7:], "dl" in q)
             return self.static(p.lstrip("/"))
 
         def do_POST(self):
@@ -341,6 +403,23 @@ def make_handler(st):
                 except Exception as e:
                     return self.send(400, {"error": str(e)})
                 return self.send(200, {"ok": ok, "page": st.ui["page"], "override": st.ui["override"]})
+            if p == "/api/tele/delete":
+                return self.send(200, {"ok": st.laps.delete(data.get("s"), data.get("f"))})
+            if p == "/api/tele/import":
+                return self.send(200, {"ok": True, "s": st.laps.import_lap(data.get("lap"), data.get("owner"))})
+            if p == "/api/ffb":
+                return self.send(200, {"ok": True, "id": st.ffb.put(data)})
+            if p == "/api/ffb/delete":
+                st.ffb.delete(data.get("id"))
+                return self.send(200, {"ok": True})
+            if p == "/api/capture/config":
+                st.cap.save_cfg(data)
+                st.apply_hotkeys()
+                return self.send(200, st.cap.status())
+            if p == "/api/video/delete":
+                return self.send(200, {"ok": st.cap.delete(data.get("f"))})
+            if p == "/api/video/offset":
+                return self.send(200, {"ok": st.cap.set_offset(data.get("f"), data.get("offset", 0))})
             if p == "/api/bindings":
                 st.binds = data.get("binds", [])
                 save_json(BINDS, st.binds)
@@ -353,6 +432,45 @@ def make_handler(st):
                     st.assign["%s|%s" % (game, prof["name"])] = prof["id"]
                 return self.send(200, {"ok": True})
             return self.send(404, {"error": "?"})
+
+        def media(self, name, download=False):
+            from urllib.parse import unquote
+            path = st.cap.safe(unquote(name))
+            if not path or not os.path.isfile(path):
+                return self.send(404, {"error": "introuvable"})
+            size = os.path.getsize(path)
+            start, end, code = 0, size - 1, 200
+            m = re.match(r"bytes=(\d*)-(\d*)", self.headers.get("Range") or "")
+            if m and (m.group(1) or m.group(2)):
+                if m.group(1):
+                    start = int(m.group(1))
+                    end = int(m.group(2)) if m.group(2) else size - 1
+                else:
+                    start = max(0, size - int(m.group(2)))
+                end = min(end, size - 1)
+                code = 206
+            self.send_response(code)
+            self.send_header("Content-Type", MIME.get(os.path.splitext(path)[1], "application/octet-stream"))
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Content-Length", str(end - start + 1))
+            if code == 206:
+                self.send_header("Content-Range", "bytes %d-%d/%d" % (start, end, size))
+            if download:
+                self.send_header("Content-Disposition", 'attachment; filename="%s"' % os.path.basename(path))
+            self.cors()
+            self.end_headers()
+            try:
+                with open(path, "rb") as f:
+                    f.seek(start)
+                    left = end - start + 1
+                    while left > 0:
+                        chunk = f.read(min(262144, left))
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        left -= len(chunk)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+                pass
 
         def stream(self):
             self.send_response(200)
@@ -372,6 +490,10 @@ def make_handler(st):
                 pass
 
     return H
+
+
+def qv(q, k):
+    return (q.get(k) or [""])[0]
 
 
 def lan_ip():
@@ -410,6 +532,11 @@ def main():
     threading.Thread(target=source_loop, args=(st,), daemon=True).start()
     st.joy = inputs.JoyWatcher(st.on_button)
     st.joy.start()
+    st.cap = capture.Capture(BASE, st.ring, lambda: st.frame)
+    st.hk = hotkeys.Hotkeys(st.action)
+    st.apply_hotkeys()
+    if not st.cap.ffmpeg:
+        print(" Video     : ffmpeg.exe absent (capture video desactivee, voir README)")
     srv = ThreadingHTTPServer(("0.0.0.0", a.port), make_handler(st))
     srv.daemon_threads = True
     ip = lan_ip()
@@ -426,6 +553,8 @@ def main():
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
+    finally:
+        st.cap.shutdown()
 
 
 if __name__ == "__main__":
