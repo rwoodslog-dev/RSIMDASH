@@ -1,6 +1,8 @@
 package com.rsim33.rsim;
 
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.webkit.JavascriptInterface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -18,7 +20,17 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);   // paysage fixe (le dash ne tourne pas avec le volant)
         immersive();
+        // pont accessible aussi depuis les pages servies par le PC : window.RSIMNative.orient("landscape-secondary")
+        getBridge().getWebView().addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void orient(String o) {
+                final int v = "landscape-secondary".equals(o) ? ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                        : "off".equals(o) ? ActivityInfo.SCREEN_ORIENTATION_SENSOR : ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
+                runOnUiThread(() -> setRequestedOrientation(v));
+            }
+        }, "RSIMNative");
         route(getIntent(), 600);
     }
 

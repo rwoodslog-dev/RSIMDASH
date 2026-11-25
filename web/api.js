@@ -38,6 +38,11 @@
       catch (e) { clearTimeout(to); return null; }
     },
   };
+  /* APK : si le PC repond, on bascule sur les pages servies par le PC -> chaque mise a jour copiee sur le PC
+     arrive toute seule sur le telephone (plus besoin de GitHub ni de reinstaller l'APK). PC eteint = pages integrees. */
+  if (isApp && base && !/[?&]local\b/.test(location.search)) {
+    window.RSIMAPI.ping(base, 1500).then(j => { if (j) location.replace(base + location.pathname.replace(/^\//, "") + location.search); });
+  }
   if (!base) return;
   const rewrite = u => (typeof u === "string" && /^(api\/|cars\.json)/.test(u)) ? base + u : u;
   const of = window.fetch.bind(window);

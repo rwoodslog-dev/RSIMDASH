@@ -89,6 +89,7 @@ let orientPref = localStorage.getItem("orient") || "landscape-primary", nativeLo
 const ANG = { "portrait-primary": 0, "landscape-primary": 90, "portrait-secondary": 180, "landscape-secondary": 270 };
 async function lockOrient() {
   nativeLock = false;
+  if (window.RSIMNative) { try { RSIMNative.orient(orientPref); nativeLock = orientPref !== "off"; updateComp(); return; } catch (e) {} }
   const P = window.Capacitor && window.Capacitor.Plugins;   // appli Android (APK)
   if (P && P.ScreenOrientation && orientPref !== "off") {
     try { await P.ScreenOrientation.lock({ orientation: orientPref }); nativeLock = true; updateComp(); return; } catch (e) {}

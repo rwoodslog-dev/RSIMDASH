@@ -131,6 +131,7 @@ document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
   document.querySelectorAll(".page").forEach(p => p.classList.toggle("on", p.id === b.dataset.p)); localStorage.setItem("remoteTab", b.dataset.p); });
 const lastTab = localStorage.getItem("remoteTab"); if (lastTab) document.querySelector(`#tabs [data-p="${lastTab}"]`).click();
 (async () => { const P = window.Capacitor && window.Capacitor.Plugins;
+  if (window.RSIMNative) { try { RSIMNative.orient(localStorage.getItem("orient") || "landscape-primary"); } catch (e) {} }
   try { if (P && P.ScreenOrientation) await P.ScreenOrientation.lock({ orientation: localStorage.getItem("orient") || "landscape-primary" }); else await screen.orientation.lock("landscape"); } catch (e) {}
   try { if (P && P.KeepAwake) P.KeepAwake.keepAwake(); else if (navigator.wakeLock) navigator.wakeLock.request("screen").catch(() => {}); } catch (e) {} })();
 
