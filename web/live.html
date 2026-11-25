@@ -15,16 +15,32 @@
   #tap { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #9ab; font: 600 18px sans-serif; background: rgba(0,0,0,.55); }
   #menu { position: fixed; top: 8px; right: 8px; display: none; background: #111c; border: 1px solid #333; border-radius: 12px; padding: 12px; color: #eee; font: 14px sans-serif; max-width: 70vw; }
   #menu select, #menu button { font-size: 15px; margin-top: 8px; width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #444; background: #1b1b1b; color: #fff; }
-  #menu small { color: #8a9; display: block; margin-top: 4px; }
+  #menu small { color: #8a9; display: block; margin-top: 10px; }
+  #menu { max-height: 92vh; overflow: auto; width: 340px; }
+  #plist .pr { display: flex; align-items: center; gap: 6px; margin-top: 6px; background: #1b1b1b; border: 1px solid #333; border-radius: 8px; padding: 4px 4px 4px 10px; }
+  #plist .pr span { flex: 1; } #plist .pr button { width: auto; margin: 0; padding: 4px 10px; }
+  #homeBtn { position: fixed; top: 8px; left: max(8px, env(safe-area-inset-left)); width: 42px; height: 42px; border-radius: 12px; z-index: 5;
+    display: flex; align-items: center; justify-content: center; text-decoration: none; color: #fff; font: 24px sans-serif;
+    background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.15); opacity: .55; }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
 <div id="tap">Touchez pour passer en plein écran</div>
+<a id="homeBtn" href="index.html?home" title="Menu">⌂</a>
 <div id="menu">
   <div id="carname">—</div><small id="how"></small>
-  <select id="prof"></select>
-  <button id="save">Utiliser ce dash pour cette voiture</button>
+  <small>📱 Cet appareil affiche</small>
+  <select id="dev"></select>
+  <small id="devTxt"></small>
+  <div id="shared">
+  <small>Page 1 — dash principal</small>
+  <select id="main"></select>
+  <small id="lockTxt"></small>
+  <small>Pages suivantes (glisse ← → sur l'écran)</small>
+  <div id="plist"></div>
+  <select id="addp"></select>
+  </div>
   <small>Orientation verrouillée (téléphone sur le volant)</small>
   <select id="orient">
     <option value="landscape-primary">Paysage (boutons à droite)</option>
@@ -32,9 +48,12 @@
     <option value="off">Libre (rotation auto)</option>
   </select>
   <small id="lockinfo"></small>
-  <button id="home">⌂ Accueil RSIM</button>
+  <small>Affichage</small>
+  <select id="fit"><option value="fill">Plein écran (tout l'écran)</option><option value="fit">Proportions d'origine (bandes noires)</option></select>
+  <button id="home">⌂ Retour au menu</button>
   <button id="close">Fermer</button>
 </div>
+
 <script src="api.js"></script>
 <script src="dash.js"></script>
 <script src="custom.js"></script>
@@ -53,15 +72,19 @@ RSIMC.loadFonts();
 const customCache = {}; let customRev = -1;
 function getCustom(id) {
   if (frame.dashRev !== customRev) { for (const k in customCache) delete customCache[k]; customRev = frame.dashRev;
-    fetch("cars.json").then(r => r.json()).then(fillProfiles); }
+    try { const c = localStorage.getItem("carsCache"); if (c) fillProfiles(JSON.parse(c)); } catch (e) {}
+fetch("cars.json").then(r => r.json()).then(fillProfiles).catch(() => {}); }
   if (!(id in customCache)) { customCache[id] = null;
-    fetch("api/dashboard?id=" + encodeURIComponent(id)).then(r => r.json()).then(j => customCache[id] = j).catch(() => {}); }
+    try { const k = localStorage.getItem("dash:" + id); if (k) customCache[id] = JSON.parse(k); } catch (e) {}   // copie locale (PC eteint)
+    fetch("api/dashboard?id=" + encodeURIComponent(id)).then(r => r.json()).then(j => { if (j && j.pages) { customCache[id] = j;
+      try { localStorage.setItem("dash:" + id, JSON.stringify(j)); } catch (e) {} } }).catch(() => {}); }
   return customCache[id];
 }
 
 /* ---- verrou d'orientation : le dash reste fixe par rapport au telephone ----
    1) verrou natif (plein ecran Android) ; 2) sinon compensation : on tourne le dessin
    a l'inverse de la rotation de l'ecran. */
+let fitPref = localStorage.getItem("fit") || "fill";
 let orientPref = localStorage.getItem("orient") || "landscape-primary", nativeLock = false, comp = 0;
 const ANG = { "portrait-primary": 0, "landscape-primary": 90, "portrait-secondary": 180, "landscape-secondary": 270 };
 async function lockOrient() {
@@ -92,19 +115,21 @@ function resize() {
   const dpr = window.devicePixelRatio || 1;
   let sw = innerWidth, sh = innerHeight;
   if (comp === 90 || comp === 270) [sw, sh] = [sh, sw];
-  const s = Math.min(sw / LW, sh / LH);
-  cv.style.width = LW * s + "px"; cv.style.height = LH * s + "px";
-  cv.width = Math.round(LW * s * dpr); cv.height = Math.round(LH * s * dpr);
+  // "fill" = tout l'ecran (le dash est etire), "fit" = proportions d'origine (bandes noires)
+  let cw = sw, ch = sh;
+  if (fitPref === "fit") { const s = Math.min(sw / LW, sh / LH); cw = LW * s; ch = LH * s; }
+  cv.style.width = cw + "px"; cv.style.height = ch + "px";
+  cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
   ctx.setTransform(cv.width / LW, 0, 0, cv.height / LH, 0, 0);
 }
 addEventListener("resize", resize); resize();
 
 function fillProfiles(j) {
-  cars = j;
-  const sel = document.getElementById("prof"); sel.innerHTML = "";
-  j.profiles.forEach(p => { const o = document.createElement("option"); o.value = p.id; o.textContent = p.name; sel.appendChild(o); });
+  cars = j; try { localStorage.setItem("carsCache", JSON.stringify(j)); } catch (e) {}
+  fillSelects();
 }
-fetch("cars.json").then(r => r.json()).then(fillProfiles);
+try { const c = localStorage.getItem("carsCache"); if (c) fillProfiles(JSON.parse(c)); } catch (e) {}
+fetch("cars.json").then(r => r.json()).then(fillProfiles).catch(() => {});
 
 if (RSIMAPI.needsSetup) location.href = "settings.html?from=live";
 function connect() {
@@ -129,19 +154,30 @@ function smooth(target) {
 function loop(ts) {
   const t = ts / 1000;
   ctx.clearRect(0, 0, LW, LH);
-  if (!frame.connected || performance.now() - lastMsg > 3000) {
-    setLogical(RSIM.W, RSIM.H);
-    RSIM.drawWaiting(ctx, t, location.host);
-  } else {
-    const d = smooth(frame);
+  const pcLost = performance.now() - lastMsg > 3000, waiting = pcLost || !frame.connected;
+  {
+    let d;
+    if (waiting) {   // pas de jeu (ou PC injoignable) : on garde le dernier dash, valeurs au repos + petit rond de chargement
+      d = Object.assign({}, IDLE, { profile: (!pcLost && frame.profile) || localStorage.getItem("lastProf") || "universal",
+        page: !pcLost && frame.profile ? frame.page || 0 : 0, autoProfile: (!pcLost && frame.autoProfile) || localStorage.getItem("lastAuto") || "universal",
+        dashRev: frame.dashRev, rec: frame.rec, recOn: frame.recOn, bufOn: frame.bufOn });
+      view = null;
+    } else {
+      d = smooth(frame);
+      if (d.profile !== savedProf) { savedProf = d.profile; localStorage.setItem("lastProf", d.profile); if (d.autoProfile) localStorage.setItem("lastAuto", d.autoProfile); }
+    }
+    if (devLock) d = Object.assign({}, d, { profile: devLock, page: devPage });   // appareil reserve a un dash / une box
     const v = curView = RSIMM.resolve(d, getCustom, cars.profiles);
     const sig = d.profile + "|" + (v.multi ? v.multi.index : "");
     if (sig !== pageSig) { if (pageSig && v.multi) pageChangedAt = t; pageSig = sig; }
     const [vw, vh] = v.kind === "loading" ? [RSIM.W, RSIM.H] : RSIMM.size(v);
     setLogical(vw, vh);
     if (v.kind === "custom") pressMark(v.dsh, v.page);
-    if (v.kind !== "loading" && !RSIMM.draw(ctx, v, d, t)) RSIM.drawWaiting(ctx, t, "profil inconnu : " + d.profile);
+    try { if (v.kind !== "loading" && !RSIMM.draw(ctx, v, d, t)) RSIM.drawWaiting(ctx, t, "profil inconnu : " + d.profile); }
+    catch (e) { if (!loop.warned) { console.warn("dash:", e); loop.warned = 1; } ctx.setTransform(cv.width / LW, 0, 0, cv.height / LH, 0, 0); RSIM.drawWaiting(ctx, t, ""); }
     RSIMM.overlay(ctx, v, vw, vh, t, pageChangedAt);
+    recBadge(ctx, d.rec, vw, vh, t);
+    if (waiting) spinner(ctx, vw, vh, t, pcLost);
   }
   requestAnimationFrame(loop);
 }
@@ -177,7 +213,47 @@ function toCanvas(e) {
   const sw = (comp === 90 || comp === 270) ? r.height : r.width, sh = (comp === 90 || comp === 270) ? r.width : r.height;
   return [(rx / sw + 0.5) * LW, (ry / sh + 0.5) * LH];
 }
-let curView = null, pageSig = "", pageChangedAt = -9;
+let savedProf = null;
+/* plusieurs appareils : chacun peut afficher son propre dash / sa box (memorise sur l'appareil).
+   live.html?show=custom:bbg_acr  -> reserve directement cet appareil a cette box */
+const qShow = new URLSearchParams(location.search).get("show");
+if (qShow !== null) localStorage.setItem("devLock", qShow === "live" ? "" : qShow);
+let devLock = localStorage.getItem("devLock") || "", devPage = 0;
+if (devLock === "remote") { if (qShow === null) location.replace("remote.html"); devLock = ""; }
+/* valeurs "au repos" quand aucun jeu ne tourne */
+const IDLE = { connected: false, game: "", car: "", gear: 0, rpm: 0, maxRpm: 8000, shiftRpm: 0, speed: 0, throttle: 0, brake: 0, clutch: 0, fuel: 0, fuelCap: 0,
+  fuelPerLap: 0, fuelLaps: null, tc: null, abs: null, map: null, bb: null, limiter: false, lights: false, absActive: false, tcActive: false, water: null, oil: null,
+  turbo: null, tyreT: [null, null, null, null], tyreP: [null, null, null, null], brakeT: [null, null, null, null], tyreWear: [null, null, null, null],
+  lap: 0, pos: 0, cur: null, last: null, best: null, delta: null, sessionLeft: null, inPit: false, paused: true, steer: 0 };
+/* petit rond de chargement dans le coin (vert = PC ok / jeu pas lance ; orange = PC injoignable) */
+function spinner(c, W, H, t, lost) {
+  const r = H * 0.022, x = W - r * 2.2, y = H - r * 2.2;
+  c.save(); c.lineWidth = r * 0.35; c.lineCap = "round";
+  c.strokeStyle = "rgba(0,0,0,0.55)"; c.beginPath(); c.arc(x, y, r * 1.35, 0, Math.PI * 2); c.fillStyle = "rgba(0,0,0,0.55)"; c.fill();
+  c.strokeStyle = "rgba(255,255,255,0.18)"; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.stroke();
+  c.strokeStyle = lost ? "#ff9f1c" : "#3fd0ff"; c.beginPath(); c.arc(x, y, r, t * 5, t * 5 + Math.PI * 1.2); c.stroke();
+  c.restore();
+}
+let curView = null, pageSig = "", pageChangedAt = -9, clipSeen = null, clipShowT = -9;
+/* video : pastille REC + message "clip enregistre" */
+function recBadge(c, r, W, H, t) {
+  if (!r) return;
+  if (clipSeen === null) clipSeen = r.clipAt;
+  if (r.clipAt !== clipSeen) { clipSeen = r.clipAt; clipShowT = t; if (navigator.vibrate) navigator.vibrate([40, 60, 40]); }
+  c.save(); c.textBaseline = "middle"; const s = H * 0.035;
+  if (r.on) {
+    const x = W - s * 6.2, y = s * 1.2; c.fillStyle = "rgba(0,0,0,0.6)"; c.beginPath(); c.roundRect(x - s * 0.8, y - s * 0.75, s * 6.4, s * 1.5, s * 0.75); c.fill();
+    if (Math.floor(t * 2) % 2 === 0) { c.fillStyle = "#ff2a2a"; c.beginPath(); c.arc(x, y, s * 0.4, 0, Math.PI * 2); c.fill(); }
+    c.fillStyle = "#fff"; c.font = "700 " + Math.round(s) + "px Rajdhani, Roboto, sans-serif"; c.textAlign = "left";
+    c.fillText("REC " + Math.floor(r.t / 60) + ":" + String(r.t % 60).padStart(2, "0"), x + s * 0.7, y + 1);
+  } else if (r.buf) { c.fillStyle = "rgba(33,224,93,0.8)"; c.beginPath(); c.arc(W - s, s, s * 0.25, 0, Math.PI * 2); c.fill(); }
+  if (t - clipShowT < 2) {
+    const tw = s * 9, x = W / 2 - tw / 2, y = H * 0.12; c.globalAlpha = Math.min(1, (2 - (t - clipShowT)) * 2);
+    c.fillStyle = "rgba(20,130,60,0.92)"; c.beginPath(); c.roundRect(x, y, tw, s * 1.8, s * 0.9); c.fill();
+    c.fillStyle = "#fff"; c.textAlign = "center"; c.font = "700 " + Math.round(s * 1.1) + "px Rajdhani, Roboto, sans-serif"; c.fillText("✓ Clip enregistré", W / 2, y + s * 0.9);
+  }
+  c.restore();
+}
 function pressMark(dsh, page) { if (lastPress && lastPress.dash === dsh) { const w = RSIMC.hit(dsh, page, lastPress.x, lastPress.y); if (w) w._pressed = lastPress.t; } }
 const sendAct = a => fetch("api/action", { method: "POST", body: JSON.stringify({ action: a }) });
 const held = {};   // pointerId -> widget (boutons "maintenu")
@@ -186,7 +262,7 @@ cv.addEventListener("pointerdown", e => {
   longDone = false; pressT = setTimeout(() => { longDone = true; openMenu(); }, 700);
   const [x, y] = toCanvas(e); swipe = { id: e.pointerId, x, y, t: performance.now() };
   const v = curView;
-  if (frame.connected && v && v.kind === "custom") {
+  if (v && v.kind === "custom") {
     const w = RSIMC.hit(v.dsh, v.page, x, y);
     if (w) {
       clearTimeout(pressT); swipe = null; lastPress = { dash: v.dsh, x, y, t: performance.now() / 1000 };
@@ -202,7 +278,8 @@ cv.addEventListener("pointermove", e => {   // glisser = changer de page (ecrans
   if (Math.abs(dx) > 15 || Math.abs(dy) > 15) clearTimeout(pressT);
   if (Math.abs(dx) > LW * 0.12 && Math.abs(dx) > Math.abs(dy) * 1.5) {
     swipe = null;
-    if (curView && curView.multi) { if (navigator.vibrate) navigator.vibrate(15); sendAct(dx < 0 ? "page_next" : "page_prev"); }
+    if (curView && curView.multi) { if (navigator.vibrate) navigator.vibrate(15);
+      if (devLock) devPage += dx < 0 ? 1 : -1; else sendAct(dx < 0 ? "page_next" : "page_prev"); }
   }
 });
 function release(e) {
@@ -216,22 +293,57 @@ cv.addEventListener("pointercancel", release);
 cv.addEventListener("pointerleave", release);
 /* interrupteurs : retour a OFF quand le jeu est ferme (option "Remettre a OFF") */
 setInterval(() => { if (!frame.connected) for (const k in customCache) { const d = customCache[k];
-  (d && d.pages || []).forEach(p => p.widgets.forEach(w => { if (w.type === "switch" && w.autoReset !== false) w._on = false; })); } }, 2000);
-function openMenu() {
-  document.getElementById("carname").textContent = frame.connected ? "[" + frame.game + "] " + (frame.car || "?") : "Aucun jeu connecté";
-  document.getElementById("how").textContent = frame.connected ? "dash : " + frame.profile + " (" + frame.how + ")" : "";
-  document.getElementById("prof").value = frame.profile;
-  document.getElementById("orient").value = orientPref;
-  document.getElementById("menu").style.display = "block";
+  (d && d.pages || []).forEach(p => (p.widgets || []).forEach(w => { if (w.type === "switch" && w.autoReset !== false) w._on = false; })); } }, 2000);
+/* ---- menu (appui long) : dash principal + pages ---- */
+function profOptions() {
+  const groups = {}, CATS = cars.categories || [];
+  (cars.profiles || []).forEach(p => { if (p.id === "custom:__live" || p.cat === "Multi-pages" || /^▤/.test(p.name || "")) return; (groups[p.cat || "Génériques"] = groups[p.cat || "Génériques"] || []).push(p); });
+  const order = [...CATS.filter(c => groups[c]), ...Object.keys(groups).filter(c => !CATS.includes(c))];
+  return order.map(c => `<optgroup label="${c}">` + groups[c].map(p => `<option value="${p.id}">${p.name}</option>`).join("") + "</optgroup>").join("");
 }
-document.getElementById("orient").onchange = e => { orientPref = e.target.value; localStorage.setItem("orient", orientPref); lockOrient(); };
-document.getElementById("home").onclick = () => location.href = "index.html";
-document.getElementById("close").onclick = () => document.getElementById("menu").style.display = "none";
-document.getElementById("save").onclick = () => {
-  if (!frame.connected) return;
-  fetch("api/assign", { method: "POST", body: JSON.stringify({ game: frame.game, car: frame.car, profile: document.getElementById("prof").value }) })
-    .then(() => document.getElementById("menu").style.display = "none");
-};
+function fillSelects() {
+  const o = profOptions();
+  document.getElementById("dev").innerHTML = '<option value="">🏁 Le dash en direct (pages communes, suit la voiture)</option><option value="remote">🖱 Télécommande PC (souris, manette, stream deck)</option>' + o;
+  document.getElementById("dev").value = devLock;
+  document.getElementById("main").innerHTML = '<option value="auto">🚗 Automatique (selon le jeu et la voiture)</option>' + o;
+  document.getElementById("addp").innerHTML = '<option value="">＋ Ajouter une page…</option><option value="auto">🚗 Dash auto</option>' + o;
+}
+const $m = id => document.getElementById(id);
+async function openMenu() {
+  $m("carname").textContent = frame.connected ? "[" + frame.game + "] " + (frame.car || "?") : "Aucun jeu connecté";
+  $m("how").textContent = frame.connected ? "page 1 : " + frame.how : "";
+  $m("orient").value = orientPref; $m("fit").value = fitPref; $m("dev").value = devLock; devUI();
+  $m("menu").style.display = "block";
+  try { renderLive(await (await fetch("api/live")).json()); } catch (e) {}
+}
+function renderLive(L) {
+  $m("main").value = L.main; $m("lockTxt").textContent = L.main === "auto" ? "Le dash change tout seul selon la voiture." : "🔒 Dash bloqué (choisis « Automatique » pour débloquer)";
+  const box = $m("plist"); box.innerHTML = "";
+  (L.extra || []).forEach((ref, i) => {
+    const el = document.createElement("div"); el.className = "pr";
+    const nm = ref === "auto" ? "🚗 Dash auto" : ((cars.profiles || []).find(p => p.id === ref) || {}).name || ref;
+    el.innerHTML = `<span>${i + 2}. ${nm}</span><button>↑</button><button>✕</button>`;
+    const [, up, del] = el.children;
+    up.onclick = () => { if (!i) return; const a = [...L.extra]; a.splice(i - 1, 0, a.splice(i, 1)[0]); saveLive({ pages: a }); };
+    del.onclick = () => { const a = [...L.extra]; a.splice(i, 1); saveLive({ pages: a }); };
+    box.appendChild(el);
+  });
+  if (!(L.extra || []).length) box.innerHTML = '<small style="margin-top:4px">Aucune page ajoutée.</small>';
+}
+async function saveLive(b) { try { renderLive(await (await fetch("api/live", { method: "POST", body: JSON.stringify(b) })).json()); } catch (e) {} }
+$m("main").onchange = async e => { await sendAct(e.target.value === "auto" ? "dash_auto" : "dash:" + e.target.value); setTimeout(openMenu, 250); };
+$m("addp").onchange = async e => { if (!e.target.value) return; await sendAct("live_add:" + e.target.value); e.target.value = ""; setTimeout(openMenu, 250); };
+function devUI() {
+  $m("shared").style.display = devLock ? "none" : "block";
+  $m("devTxt").textContent = devLock ? "Réservé à cet appareil : les autres écrans ne changent pas. Les boutons envoient quand même leurs touches au PC."
+    : "Mêmes pages que les autres appareils en mode « dash en direct ».";
+}
+$m("dev").onchange = e => { if (e.target.value === "remote") { localStorage.setItem("devLock", "remote"); location.href = "remote.html"; return; }
+  devLock = e.target.value; devPage = 0; localStorage.setItem("devLock", devLock); devUI(); };
+$m("fit").onchange = e => { fitPref = e.target.value; localStorage.setItem("fit", fitPref); resize(); };
+$m("orient").onchange = e => { orientPref = e.target.value; localStorage.setItem("orient", orientPref); lockOrient(); };
+$m("home").onclick = () => location.href = "index.html?home";
+$m("close").onclick = () => $m("menu").style.display = "none";
 </script>
 </body>
 </html>

@@ -42,23 +42,32 @@
   .phone { display:grid; grid-template-columns:auto 1fr; gap:24px; align-items:start; background:var(--p); border:1px solid var(--b); border-radius:12px; padding:20px; }
   .url { font-size:30px; font-weight:700; color:#fff; letter-spacing:.5px; }
   ol { margin:8px 0 0; padding-left:20px; color:var(--m); } ol li { margin:4px 0; }
+  .homeb { color:var(--a); text-decoration:none; font-weight:700; border:1px solid var(--b); border-radius:8px; padding:6px 12px; }
+  .lp { background:var(--p); border:1px solid #1d6fe0; border-radius:12px; padding:12px 14px; margin-bottom:18px; }
+  .lp h3 { margin:0 0 8px; font-size:14px; } .lp .pages { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .lp .pg { background:var(--p2); border:1px solid var(--b); border-radius:9px; padding:6px 6px 6px 10px; display:flex; gap:6px; align-items:center; }
+  .lp .pg b { color:var(--a); } .lp .pg button { padding:2px 8px; font-size:12px; }
+  .lp .hint { color:var(--m); font-size:12px; margin-top:8px; }
   .toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#1d6fe0; padding:9px 18px; border-radius:9px; display:none; z-index:9; }
+  .golive { background:#e10600; color:#fff; font:italic 900 16px "Titillium Web", sans-serif; padding:10px 22px; text-decoration:none; letter-spacing:1px;
+    clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%); margin-left:auto; }
 </style>
+<link rel="stylesheet" href="theme.css">
 </head>
 <body>
 <header>
   <img src="icon-192.png" alt="">
-  <a href="index.html" style="color:inherit;text-decoration:none"><h1>RSIM · DASHBOARDS</h1></a>
+  <a href="index.html?home" class="homeb">⌂ Menu</a>
+  <a href="index.html?home" style="color:inherit;text-decoration:none"><h1>DASH</h1></a>
   <nav>
-    <button data-s="dashes" class="on">Dashboards</button>
+    <button data-s="dashes" class="on">Mes dashs</button>
     <button data-s="cars">Voitures</button>
-    <button data-s="phone">Téléphone</button>
-    <button data-s="buttons">Boutons volant</button>
   </nav>
   <div class="live" id="live">…</div>
 </header>
 <main>
   <section id="s-dashes" class="on">
+    <div class="lp" id="lp"></div>
     <div class="cats" id="cats"></div>
     <div id="gAll"></div>
   </section>
@@ -138,7 +147,7 @@ function drawThumb(cv, p, d, t) {
   }
 }
 function card(p) {
-  const cur = state.frame.connected && state.frame.profile === p.id;
+  const cur = LIVE.main === p.id, inPages = (LIVE.extra || []).includes(p.id);
   const el = document.createElement("div"); el.className = "card" + (cur ? " cur" : "");
   const cdsh = p.family === "custom" ? customs[p.id.slice(7)] : null;
   const asp = cdsh ? (cdsh.w ? [cdsh.w, cdsh.h] : null) : RSIM.ASPECT && RSIM.ASPECT[p.family];
@@ -152,25 +161,26 @@ function card(p) {
   const pname = r => r === "auto" ? "Dash de la voiture" : ((profiles.find(x => x.id === r) || {}).name || r).replace(/^[★🎛▤] /, "");
   const nBtn = isC ? (dsh.pages || []).reduce((n, pg) => n + (pg.widgets || []).filter(w => w.type === "button" || w.type === "switch").length, 0) : 0;
   info.innerHTML = `<div class="name"><span>${p.name.replace(/^[★🎛▤] /, "")}</span><span class="tag ${isC ? "c" : ""}">${p.aspect === "16:9" ? "16:9" : "20:9"}</span></div>
-    <div class="sub">${isM ? dsh.pages.map((pg, i) => (i + 1) + ". " + pname(pg.ref)).join(" · ") : isBB ? nBtn + " boutons / interrupteurs" : isC ? (dsh.pages || []).length + " page(s)" : (p.match || []).length ? "voitures : " + p.match.slice(0, 4).join(", ") : p.cat || ""}${cur ? " · <b style='color:var(--g)'>affiché</b>" : ""}</div>`;
+    <div class="sub">${isM ? dsh.pages.map((pg, i) => (i + 1) + ". " + pname(pg.ref)).join(" · ") : isBB ? nBtn + " boutons / interrupteurs" : isC ? (dsh.pages || []).length + " page(s)" : (p.match || []).length ? "voitures : " + p.match.slice(0, 4).join(", ") : p.cat || ""}${cur ? " · <b style='color:var(--g)'>🔒 page 1</b>" : ""}${inPages ? " · <b style='color:var(--a)'>dans les pages</b>" : ""}</div>`;
   const act = document.createElement("div"); act.className = "act";
   const btn = (txt, cls, fn) => { const b = document.createElement("button"); b.textContent = txt; if (cls) b.className = cls; b.onclick = fn; act.appendChild(b); };
-  btn("Afficher sur le téléphone", "pri", async () => {
-    if (demo) await post("api/demo", { profile: p.id, maxRpm: 8000 }); else await post("api/action", { action: "dash:" + p.id });
-    toast("« " + p.name.replace(/^★ /, "") + " » envoyé au téléphone"); refresh();
+  btn("🔒 Dash principal (page 1)", "pri", async () => {
+    await post("api/action", { action: "dash:" + p.id }); toast("« " + p.name.replace(/^[★🎛▤] /, "") + " » bloqué en page 1"); loadLive();
   });
-  btn("Mettre sur la voiture en cours", "", async () => {
+  btn("＋ Ajouter aux pages", "", async () => {
+    await post("api/action", { action: "live_add:" + p.id }); toast("Ajouté à la suite des pages du dash en direct"); loadLive();
+  });
+  btn("Dash auto de cette voiture", "", async () => {
     const f = state.frame; if (!f.connected) return toast("Aucun jeu en cours");
     await post("api/assign", { game: f.game, car: f.car, profile: p.id }); await post("api/action", { action: "dash_auto" });
     toast("Attribué à " + f.car); refresh();
   });
   if (isBB) btn("🎛 Assigner les touches", "", () => location.href = "buttonbox.html?id=" + encodeURIComponent(dsh.id));
-  if (isM) btn("✎ Modifier les pages", "", () => location.href = "multipage.html?id=" + encodeURIComponent(dsh.id));
   if (isC && !isBB) btn("Supprimer", "dan", async () => { if (!confirm("Supprimer « " + dsh.name + " » ?")) return; await post("api/dashboard/delete", { id: dsh.id }); load(); });
   el.appendChild(info); info.appendChild(act); return el;
 }
 async function load() {
-  const cj = await (await fetch("cars.json")).json(); profiles = cj.profiles; CATS = cj.categories || [];
+  const cj = await (await fetch("cars.json")).json(); profiles = cj.profiles.filter(p => p.cat !== "Multi-pages" && !/^▤/.test(p.name || "") && p.id !== "custom:__live"); CATS = cj.categories || [];
   const list = await (await fetch("api/dashboards")).json();
   customs = {};
   await Promise.all(list.map(async x => customs[x.id] = await (await fetch("api/dashboard?id=" + encodeURIComponent(x.id))).json()));
@@ -185,9 +195,7 @@ function render() {
   const bar = $("cats"); bar.innerHTML = "";
   ["Tous", ...present].forEach(c => { const b = document.createElement("button"); b.textContent = c + (c === "Tous" ? "" : " (" + profiles.filter(p => (p.cat || "Génériques") === c).length + ")");
     if (c === curCat) b.className = "on"; b.onclick = () => { curCat = c; localStorage.setItem("hubCat", c); render(); }; bar.appendChild(b); });
-  const nm = document.createElement("button"); nm.textContent = "＋ Écran multi-pages"; nm.style.marginLeft = "auto"; nm.onclick = () => location.href = "multipage.html"; bar.appendChild(nm);
-  const auto = document.createElement("button"); auto.textContent = "↺ Dash automatique";
-  auto.onclick = async () => { await post("api/action", { action: "dash_auto" }); toast("Dashboard automatique selon la voiture"); }; bar.appendChild(auto);
+
   const all = $("gAll"); all.innerHTML = "";
   (curCat === "Tous" ? present : [curCat]).forEach(c => {
     const h = document.createElement("h2"); h.textContent = c; all.appendChild(h);
@@ -195,6 +203,24 @@ function render() {
     profiles.filter(p => (p.cat || "Génériques") === c).forEach(p => g.appendChild(card(p)));
   });
   renderSeen();
+}
+
+/* ---------- dash en direct : page 1 (auto ou bloque) + pages ajoutees ---------- */
+let LIVE = { main: "auto", extra: [] };
+const nameOf = r => r === "auto" ? "🚗 Dash auto (jeu + voiture)" : ((profiles.find(x => x.id === r) || {}).name || r).replace(/^[★🎛▤] /, "");
+async function loadLive() { LIVE = await (await fetch("api/live")).json(); renderLive(); render(); }
+async function saveLive(b) { LIVE = await post("api/live", b); renderLive(); render(); }
+function renderLive() {
+  const lp = $("lp"), ex = LIVE.extra || [];
+  lp.innerHTML = `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><h3 style="margin:0">📱 Mon dash (pages)</h3>
+    <a href="live.html" class="golive">▶ LANCER EN PLEIN ÉCRAN</a></div><div class="pages">
+    <div class="pg"><b>1</b> ${nameOf(LIVE.main)} ${LIVE.main === "auto" ? "" : '<button id="unlock">🔓 Repasser en auto</button>'}</div>
+    ${ex.map((r, i) => `<div class="pg"><b>${i + 2}</b> ${nameOf(r)} <button data-up="${i}">↑</button><button data-dn="${i}">↓</button><button data-rm="${i}" class="dan">✕</button></div>`).join("")}
+  </div><div class="hint">Page 1 = dash automatique selon le jeu et la voiture, ou le dash que tu bloques (« 🔒 Dash principal »). Ajoute d'autres pages avec « ＋ Ajouter aux pages » ; sur le téléphone, glisse ← → pour changer de page.</div>`;
+  const u = $("unlock"); if (u) u.onclick = () => post("api/action", { action: "dash_auto" }).then(loadLive);
+  lp.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { const a = [...ex]; a.splice(+b.dataset.rm, 1); saveLive({ pages: a }); });
+  lp.querySelectorAll("[data-up]").forEach(b => b.onclick = () => { const i = +b.dataset.up; if (!i) return; const a = [...ex]; a.splice(i - 1, 0, a.splice(i, 1)[0]); saveLive({ pages: a }); });
+  lp.querySelectorAll("[data-dn]").forEach(b => b.onclick = () => { const i = +b.dataset.dn; if (i >= ex.length - 1) return; const a = [...ex]; a.splice(i + 1, 0, a.splice(i, 1)[0]); saveLive({ pages: a }); });
 }
 
 /* ---------- voitures ---------- */
@@ -218,11 +244,11 @@ async function refresh() {
   state = await (await fetch("api/state")).json(); demo = state.demo;
   const f = state.frame;
   $("live").innerHTML = f.connected
-    ? `<span class="dot on"></span><b>${f.game}</b> — ${f.car}<br>dash : ${(profiles.find(p => p.id === f.profile) || {}).name || f.profile} (${f.how})${f.page ? " · page " + (f.page + 1) : ""}`
+    ? `<span class="dot on"></span><b>${f.game}</b> — ${f.car}<br>page 1 : ${f.liveMain === "auto" ? nameOf(f.autoProfile) + " (auto)" : nameOf(f.liveMain) + " 🔒"} · page affichée ${(f.page || 0) + 1}`
     : `<span class="dot"></span>Aucun jeu détecté${demo ? " (mode démo)" : ""}<br>Téléphone : ${state.phoneUrl || ""}`;
   $("url").textContent = state.phoneUrl || location.host;
-  const sig = JSON.stringify([f.profile, (state.seen || []).length, state.assign]);
-  if (sig !== seenSig) { seenSig = sig; render(); }
+  const sig = JSON.stringify([f.liveMain, f.dashRev, (state.seen || []).length, state.assign]);
+  if (sig !== seenSig) { seenSig = sig; loadLive(); }
 }
 async function binds() {
   const j = await (await fetch("api/bindings")).json();
@@ -233,7 +259,7 @@ async function binds() {
 }
 let lastA = 0;
 function anim(ts) { if (ts - lastA > 400) { lastA = ts; const t = ts / 1000; thumbs.forEach(([cv, p]) => drawThumb(cv, p, sample, t)); } requestAnimationFrame(anim); }
-load().then(() => { refresh(); binds(); setInterval(refresh, 1500); requestAnimationFrame(anim); });
+load().then(() => { loadLive(); refresh(); binds(); setInterval(refresh, 1500); requestAnimationFrame(anim); });
 </script>
 </body>
 </html>

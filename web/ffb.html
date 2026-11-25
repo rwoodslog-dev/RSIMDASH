@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060606">
+<link rel="icon" href="icon-192.png">
+<title>RSIM · FFB</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 sans-serif; }
+  header { display:flex; align-items:center; gap:10px; padding:12px 18px; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:20px; }
+  input, select, button, textarea { font:inherit; padding:6px 9px; }
+  button { cursor:pointer; }
+  .wheelbar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:12px 18px 0; }
+  .wb { padding:10px 14px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .wb b.big { font:italic 900 20px "Titillium Web", sans-serif; text-transform:uppercase; }
+  main { display:grid; grid-template-columns: 300px minmax(0, 1fr); gap:14px; padding:14px 18px; }
+  @media (max-width:900px) { main { grid-template-columns: 1fr; } }
+  .side { display:grid; gap:6px; align-content:start; }
+  .side h3 { margin:12px 0 2px; font-size:13px; }
+  .pf { padding:8px 10px; cursor:pointer; }
+  .pf small { display:block; color:#9b9b9b; }
+  .auto { font-size:10px; background:#e10600; color:#fff; padding:1px 6px; margin-left:4px; font-style:normal; vertical-align:middle; }
+  .card { padding:14px; margin-bottom:12px; }
+  .card h2 { margin:0 0 10px; font-size:15px; }
+  .row { display:grid; grid-template-columns: 230px minmax(0, 1fr) 130px; gap:10px; align-items:center; margin:6px 0; }
+  .row input[type=range] { width:100%; padding:0; }
+  .row input[type=number] { width:84px; }
+  .top { display:grid; grid-template-columns: 2fr 1fr 1fr 1fr 2fr; gap:10px; }
+  @media (max-width:1200px) { .top { grid-template-columns: 1fr 1fr; } }
+  .top label, .lab { color:#9b9b9b; font-size:12px; display:block; margin-bottom:3px; }
+  .top input, .top select { width:100%; }
+  .eq { display:flex; gap:18px; align-items:flex-end; }
+  .eq div { display:grid; justify-items:center; gap:4px; font-size:12px; color:#9b9b9b; }
+  .eq input[type=range] { writing-mode: vertical-lr; direction: rtl; height:120px; width:26px; }
+  .gs { display:grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 34px; gap:6px; margin:5px 0; }
+  .ped { display:flex; gap:14px; flex-wrap:wrap; }
+  .ped div { text-align:center; color:#9b9b9b; font-size:12px; }
+  .ped canvas { width:200px; height:200px; background:#0a0a0a; border:1px solid #2a2a2a; touch-action:none; cursor:grab; }
+  textarea { width:100%; min-height:60px; }
+  .hint { color:#9b9b9b; font-size:13px; }
+  .ok { color:#21e05d; } .warn { color:#ffb000; }
+  details summary { cursor:pointer; color:#9b9b9b; }
+  .toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); padding:8px 16px; display:none; z-index:9; }
+</style>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<header>
+  <a href="index.html?home">⌂ Menu</a><h1>FFB</h1>
+  <button id="bNew">＋ Nouveau profil</button>
+  <button id="bImp">⬆ Importer (profil d'un ami)</button><input type="file" id="fImp" accept=".json" multiple hidden>
+</header>
+<div class="wheelbar"><div class="wb card" id="wb">…</div><div class="wb card" id="st">…</div></div>
+<main>
+  <div class="side" id="list"></div>
+  <div id="ed"></div>
+</main>
+<div class="toast" id="toast"></div>
+<script src="api.js"></script>
+<script>
+"use strict";
+if (RSIMAPI.needsSetup) location.href = "settings.html?first=1";
+const $ = id => document.getElementById(id);
+const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 2400); };
+const post = (u, b) => fetch(u, { method: "POST", body: JSON.stringify(b || {}) }).then(r => r.json());
+const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+const ago = t => { if (!t) return ""; const s = Date.now() / 1000 - t; return s < 90 ? "à l'instant" : s < 3600 ? "il y a " + Math.round(s / 60) + " min" : s < 86400 ? "il y a " + Math.round(s / 3600) + " h" : new Date(t * 1000).toLocaleDateString(); };
+let META = {}, PROFILES = [], P = null, curId = null, dirty = false;
+
+async function load(sel) {
+  const j = await (await fetch("api/ffb")).json(); META = j; PROFILES = j.profiles;
+  const c = await (await fetch("api/ffb/current")).json(); curId = c.profile ? c.profile.id : null;
+  // volant
+  const W = META.wheel || {}, D = META.detected || {};
+  $("wb").innerHTML = `🎡 Volant : <b class="big">${esc(W.brand || "non détecté")} ${esc(W.model || "")}</b>
+    <select id="wBrand"><option value="">Détection auto${D.brand ? " (" + esc(D.brand + " " + (D.model || "")) + ")" : ""}</option>${Object.keys(META.wheels).map(b => `<option ${META.override && META.override.brand === b ? "selected" : ""}>${b}</option>`).join("")}</select>
+    <input id="wModel" placeholder="Modèle (ex : R12, CSL DD…)" value="${esc((META.override || {}).model || "")}" style="width:180px">`;
+  $("wBrand").onchange = $("wModel").onchange = async () => { await post("api/ffb/wheel", { brand: $("wBrand").value, model: $("wModel").value }); load(); };
+  const S = META.status || {};
+  $("st").innerHTML = c.car ? `🚗 <b>${esc(c.game)}</b> · ${esc(c.car)} → <b>${c.profile ? esc(c.profile.name) : "aucun profil"}</b>
+      <span class="${S.found ? "ok" : "warn"}">${S.at ? (S.found ? "● réglages du jeu relevés (" + S.found + ")" : "● fichiers de réglages du jeu introuvables") : ""}</span>
+      <button id="bScan">↻ Relever maintenant</button>`
+    : `<span class="hint">Lance un jeu : RSIM relève tout seul tes réglages FFB (jeu ${W.brand === "Moza" ? "+ Pit House" : ""}) et les range dans un profil « auto ».</span>`;
+  if ($("bScan")) $("bScan").onclick = async () => { const r = await post("api/ffb/scan"); toast(r.profile ? "Réglages relevés" : "Aucun réglage trouvé pour ce jeu"); load(); };
+  renderList();
+  const want = sel || (P && P.id) || curId || (PROFILES[0] && PROFILES[0].id);
+  open(PROFILES.find(p => p.id === want) || PROFILES[0]);
+}
+function renderList() {
+  const box = $("list"); box.innerHTML = "";
+  const groups = {};
+  PROFILES.forEach(p => { const k = ((p.wheel || {}).brand || "Autre") + " " + ((p.wheel || {}).model || ""); (groups[k.trim()] = groups[k.trim()] || []).push(p); });
+  Object.keys(groups).sort().forEach(g => {
+    const h = document.createElement("h3"); h.textContent = "🎡 " + g; box.appendChild(h);
+    groups[g].sort((a, b) => (a.game || "").localeCompare(b.game || "") || (b.auto ? 1 : 0) - (a.auto ? 1 : 0)).forEach(p => {
+      const el = document.createElement("div"); el.className = "pf card" + (P && P.id === p.id ? " on" : "");
+      el.innerHTML = `<b>${esc(p.name)}</b>${p.auto ? '<span class="auto">AUTO</span>' : ""}<small>${esc(p.game)}${p.id === curId ? " · ● en cours" : ""}${p.auto ? " · " + ago(p.captured || p.updated) : ""}</small>`;
+      el.onclick = () => { if (dirty && !confirm("Modifications non enregistrées. Continuer ?")) return; open(p); }; box.appendChild(el); }); });
+}
+function open(p) { if (!p) { $("ed").innerHTML = ""; return; } P = JSON.parse(JSON.stringify(p)); dirty = false; renderList(); renderEd(); }
+function renderEd() {
+  const e = $("ed"), brand = (P.wheel || {}).brand || "Autre", WT = META.wheels[brand] || META.wheels.Autre, b = P.base || {};
+  const games = [...new Set([...META.games, P.game])];
+  e.innerHTML = `
+  <div class="card"><div class="top">
+    <div><label>Nom du profil</label><input id="pName" value="${esc(P.name)}"></div>
+    <div><label>Volant</label><select id="pBrand">${Object.keys(META.wheels).map(x => `<option ${x === brand ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+    <div><label>Modèle</label><input id="pModel" value="${esc((P.wheel || {}).model || "")}"></div>
+    <div><label>Jeu</label><select id="pGame">${games.map(g => `<option ${g === P.game ? "selected" : ""}>${esc(g)}</option>`).join("")}</select></div>
+    <div><label>Voitures (mots-clés, vide = tout le jeu)</label><input id="pMatch" value="${esc((P.match || []).join(", "))}"></div>
+  </div>
+  ${P.auto ? `<p class="hint">🔄 Profil <b>automatique</b> : RSIM le met à jour tout seul quand tu changes tes réglages dans le jeu${brand === "Moza" ? " ou dans Pit House" : ""} (dernier relevé : ${ago(P.captured)}). « Dupliquer » pour figer une version à garder ou partager.</p>` : ""}
+  <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+    <button class="pri" id="bSave">Enregistrer</button><button id="bDup">Dupliquer</button><button id="bExp">⬇ Partager (fichier)</button>
+    <button class="dan" id="bDel">Supprimer</button></div></div>
+  <div class="card"><h2>Réglages du volant · ${esc(WT.soft)}</h2>
+    ${WT.fields.map(([k, l, u, mn, mx, st]) => `<div class="row"><span>${l}</span><input type="range" min="${mn}" max="${mx}" step="${st}" value="${b[k] ?? mn}" data-b="${k}">
+      <span><input type="number" min="${mn}" max="${mx}" step="${st}" value="${b[k] ?? mn}" data-n="${k}"> ${u}</span></div>`).join("")}
+    ${WT.eq ? `<div class="lab" style="margin-top:12px">Égaliseur d'effets FFB (%)</div><div class="eq">${WT.eq.map((band, i) => `<div><span data-eqv="${i}">${(P.eq || [])[i] ?? 100}</span><input type="range" min="0" max="200" step="5" value="${(P.eq || [])[i] ?? 100}" data-eq="${i}">${band}</div>`).join("")}</div>` : ""}
+    ${(P.wheel_raw || []).length ? `<details style="margin-top:10px"><summary>Valeurs lues dans ${esc(WT.soft)} (${P.wheel_raw.length})</summary><div class="hint">${P.wheel_raw.map(r => esc(r[0]) + " = " + esc(r[1])).join("<br>")}</div></details>` : ""}
+  </div>
+  <div class="card"><h2>Réglages dans le jeu · ${esc(P.game)}</h2><div id="gs"></div><button id="bGs">＋ Ajouter un réglage</button>
+    ${(P.sources || []).length ? `<details style="margin-top:8px"><summary>Fichiers lus (${P.sources.length})</summary><div class="hint">${P.sources.map(esc).join("<br>")}</div></details>` : ""}</div>
+  <div class="card"><h2>Courbes des pédales</h2><div class="ped">
+    ${[["throttle", "Accélérateur"], ["brake", "Frein"], ["clutch", "Embrayage"]].map(([k, l]) => `<div><canvas width="400" height="400" data-ped="${k}"></canvas><br>${l}</div>`).join("")}</div></div>
+  <div class="card"><h2>Notes</h2><textarea id="pNotes">${esc(P.notes)}</textarea></div>`;
+  const mark = () => { dirty = true; };
+  $("pName").oninput = ev => { P.name = ev.target.value; mark(); };
+  $("pBrand").onchange = ev => { P.wheel = Object.assign({}, P.wheel, { brand: ev.target.value }); mark(); renderEd(); };
+  $("pModel").oninput = ev => { P.wheel = Object.assign({}, P.wheel, { model: ev.target.value }); mark(); };
+  $("pGame").onchange = ev => { P.game = ev.target.value; mark(); renderEd(); };
+  $("pMatch").oninput = ev => { P.match = ev.target.value.split(",").map(s => s.trim()).filter(Boolean); mark(); };
+  $("pNotes").oninput = ev => { P.notes = ev.target.value; mark(); };
+  P.base = P.base || {};
+  e.querySelectorAll("[data-b]").forEach(r => r.oninput = () => { P.base[r.dataset.b] = +r.value; e.querySelector(`[data-n="${r.dataset.b}"]`).value = r.value; mark(); });
+  e.querySelectorAll("[data-n]").forEach(r => r.oninput = () => { P.base[r.dataset.n] = +r.value; e.querySelector(`[data-b="${r.dataset.n}"]`).value = r.value; mark(); });
+  e.querySelectorAll("[data-eq]").forEach(r => r.oninput = () => { P.eq = P.eq || [100, 100, 100, 100, 100, 100]; P.eq[+r.dataset.eq] = +r.value; e.querySelector(`[data-eqv="${r.dataset.eq}"]`).textContent = r.value; mark(); });
+  renderGs();
+  $("bGs").onclick = () => { P.game_settings.push(["", ""]); mark(); renderGs(); };
+  e.querySelectorAll("[data-ped]").forEach(c => pedal(c, c.dataset.ped));
+  $("bSave").onclick = save;
+  $("bDup").onclick = () => { P = JSON.parse(JSON.stringify(P)); delete P.id; P.auto = false; P.name = P.name.replace(/ \(auto\)$/, "") + " (copie)"; dirty = true; renderEd(); toast("Copie créée : clique Enregistrer"); };
+  $("bExp").onclick = () => { const x = JSON.parse(JSON.stringify(P)); delete x.sources; delete x.id; x.auto = false; x.rsim = "ffb";
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(x, null, 1)], { type: "application/json" }));
+    a.download = ("RSIM_FFB_" + ((P.wheel || {}).brand || "") + "_" + P.game + "_" + P.name).replace(/[^\w-]+/g, "_") + ".json"; a.click(); };
+  $("bDel").onclick = async () => { if (!P.id || !confirm("Supprimer « " + P.name + " » ?")) return; await post("api/ffb/delete", { id: P.id }); P = null; load(); };
+}
+function renderGs() {
+  const box = $("gs"); box.innerHTML = ""; P.game_settings = P.game_settings || [];
+  if (!P.game_settings.length) box.innerHTML = '<p class="hint">Rien pour l\'instant : roule un peu, les réglages FFB du jeu seront relevés tout seuls.</p>';
+  P.game_settings.forEach((row, i) => {
+    const el = document.createElement("div"); el.className = "gs";
+    el.innerHTML = `<input value="${esc(row[0])}" placeholder="Réglage"><input value="${esc(row[1])}" placeholder="Valeur"><button class="dan">✕</button>`;
+    const [a, b, x] = el.children;
+    a.oninput = () => { row[0] = a.value; dirty = true; }; b.oninput = () => { row[1] = b.value; dirty = true; };
+    x.onclick = () => { P.game_settings.splice(i, 1); dirty = true; renderGs(); };
+    box.appendChild(el);
+  });
+}
+function pedal(cv, k) {
+  P.pedals = P.pedals || {}; const pts = P.pedals[k] = P.pedals[k] || [0, 25, 50, 75, 100];
+  const c = cv.getContext("2d"), S = 400, m = 28, w = S - 2 * m, col = { throttle: "#21e05d", brake: "#e10600", clutch: "#2fb7ff" }[k];
+  const px = i => m + w * i / (pts.length - 1), py = v => m + w * (1 - v / 100);
+  function draw() {
+    c.clearRect(0, 0, S, S); c.strokeStyle = "#1d1d1d"; c.lineWidth = 1;
+    for (let g = 0; g <= 4; g++) { c.beginPath(); c.moveTo(m, m + w * g / 4); c.lineTo(m + w, m + w * g / 4); c.moveTo(m + w * g / 4, m); c.lineTo(m + w * g / 4, m + w); c.stroke(); }
+    c.setLineDash([6, 6]); c.strokeStyle = "#444"; c.beginPath(); c.moveTo(m, m + w); c.lineTo(m + w, m); c.stroke(); c.setLineDash([]);
+    c.strokeStyle = col; c.lineWidth = 4; c.beginPath(); pts.forEach((v, i) => i ? c.lineTo(px(i), py(v)) : c.moveTo(px(i), py(v))); c.stroke();
+    c.font = "italic 900 18px 'Titillium Web', sans-serif"; c.textAlign = "center";
+    pts.forEach((v, i) => { c.beginPath(); c.arc(px(i), py(v), 10, 0, Math.PI * 2); c.fillStyle = col; c.fill(); c.fillStyle = "#fff"; c.fillText(v, px(i), Math.max(18, py(v) - 16)); });
+  }
+  let dragI = null;
+  const pos = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * S, (e.clientY - r.top) / r.height * S]; };
+  cv.onpointerdown = e => { const [x] = pos(e); dragI = Math.max(0, Math.min(pts.length - 1, Math.round((x - m) / w * (pts.length - 1)))); cv.setPointerCapture(e.pointerId); move(e); };
+  const move = e => { if (dragI == null) return; const [, y] = pos(e); pts[dragI] = Math.max(0, Math.min(100, Math.round((1 - (y - m) / w) * 100))); dirty = true; draw(); };
+  cv.onpointermove = move; cv.onpointerup = () => dragI = null; draw();
+}
+async function save() { if (!P.name.trim()) return toast("Donne un nom au profil"); const r = await post("api/ffb", P); P.id = r.id; dirty = false; toast("Profil enregistré"); load(P.id); }
+$("bNew").onclick = () => { const W = META.wheel || {}, brand = W.brand || "Autre", g = META.games[0];
+  const base = {}; (META.wheels[brand] || META.wheels.Autre).fields.forEach(f => base[f[0]] = f[3]);
+  open({ name: "Nouveau profil", game: g, wheel: { brand, model: W.model || "" }, match: [], base, eq: [100, 100, 100, 100, 100, 100],
+    game_settings: JSON.parse(JSON.stringify(META.gameFields[g] || [])), pedals: null, notes: "" }); dirty = true; };
+$("bImp").onclick = () => $("fImp").click();
+$("fImp").onchange = async ev => {
+  const myBrand = (META.wheel || {}).brand;
+  for (const f of ev.target.files) { try { const p = JSON.parse(await f.text()); delete p.id; p.auto = false;
+    if (myBrand && p.wheel && p.wheel.brand && p.wheel.brand !== myBrand) toast("Attention : profil prévu pour un volant " + p.wheel.brand);
+    await post("api/ffb", p); } catch (er) { toast("Fichier invalide"); } }
+  ev.target.value = ""; load(); };
+addEventListener("beforeunload", e => { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+let sig = "";
+async function quiet() { if (dirty) return; try { const j = await (await fetch("api/ffb")).json();
+  const n = JSON.stringify([j.profiles.map(p => p.id + p.updated), j.wheel, (j.status || {}).at]); if (sig && n !== sig) load(); sig = n; } catch (e) {} }
+load().then(quiet); setInterval(quiet, 10000);
+</script>
+</body>
+</html>

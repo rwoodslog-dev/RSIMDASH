@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b0e12">
+<meta name="theme-color" content="#060606">
 <link rel="icon" href="icon-192.png">
 <title>RSIM · Vidéos</title>
 <style>
@@ -40,23 +40,32 @@
   .hint { color:var(--m); font-size:13px; } .err { color:#ff8a80; font-size:13px; white-space:pre-wrap; }
   .toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#1d6fe0; padding:8px 16px; border-radius:8px; display:none; z-index:9; }
   progress { width:100%; }
+  .ovl { display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; }
+  .ovl label { display:flex; gap:6px; align-items:center; color:var(--t); font-size:13px; margin:0; cursor:pointer; }
+  #ov.move { pointer-events:auto; cursor:move; outline:2px dashed #3fd0ff; }
+  #bMove.on { background:#1d6fe0; }
 </style>
+<link rel="stylesheet" href="theme.css">
 </head>
 <body>
 <header>
-  <a href="index.html">← Accueil</a><h1>Vidéos</h1>
+  <a href="index.html?home">⌂ Menu</a><h1>Galerie</h1>
   <button class="rec" id="bRec">● Enregistrer</button>
   <button id="bBuf">Replay : OFF</button>
   <button id="bClip">💾 Sauver le replay</button>
+  <button id="bSnapH">📷 Photo</button>
   <span class="pill" id="st">…</span>
+
   <button id="bCfg" style="margin-left:auto">⚙ Réglages capture</button>
 </header>
+<nav class="gnav"><a href="videos.html" class="on">🎥 Vidéos</a><a href="photos.html">🖼 Photos</a><a href="montage.html">🎬 Montage TikTok</a></nav>
 <main>
   <div class="panel" id="cfg">
     <div id="ffInfo"></div>
     <div class="cfgg">
       <div><label>Méthode de capture</label><select id="cPipe"></select><button id="bProbe" style="margin-top:6px">Tester les méthodes</button><div class="hint" id="probe"></div></div>
-      <div><label>Images / seconde</label><select id="cFps"><option>30</option><option>60</option><option>120</option></select></div>
+      <div><label>Images / seconde (maximum)</label><select id="cFps"><option>30</option><option>60</option><option>120</option><option>144</option><option>165</option><option>240</option></select>
+        <label style="margin-top:6px"><input type="checkbox" id="cVfr"> S'adapter aux FPS du jeu (fluide, pas d'images en double)</label></div>
       <div><label>Débit vidéo (Mbit/s) — 40 = très bonne qualité 1080p</label><input type="number" id="cBr" min="5" max="150"></div>
       <div><label>Écran capturé (0 = principal)</label><input type="number" id="cMon" min="0" max="5"></div>
       <div><label>Son (périphérique d'enregistrement)</label><select id="cAudio"></select>
@@ -66,6 +75,7 @@
       <div><label>Raccourci : vidéo marche / arrêt</label><input id="cHR"></div>
       <div><label>Raccourci : sauver le replay</label><input id="cHC"></div>
       <div><label>Raccourci : replay on / off</label><input id="cHB"></div>
+      <div><label>Raccourci : photo de l'écran</label><input id="cHP"></div>
     </div>
     <div><button class="pri" id="bCfgSave">Enregistrer les réglages</button> <button id="bDiag">🩺 Diagnostic capture</button></div>
     <pre class="err" id="diag" style="display:none;background:#0c1015;border:1px solid var(--b);border-radius:8px;padding:10px;max-height:340px;overflow:auto"></pre>
@@ -82,9 +92,11 @@
         <canvas id="strip"></canvas>
       </div>
       <div class="panel">
-        <div><label>Overlay télémétrie</label><select id="oStyle">
-          <option value="dash">Mini dash (coin)</option><option value="band">Bandeau bas</option><option value="pedals">Pédales + volant</option><option value="none">Aucun</option></select></div>
+        <div><label>Télémétrie affichée sur la vidéo (coche pour ajouter)</label><div id="ovList" class="ovl"></div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button id="bMove">✥ Déplacer les éléments</button><button id="bOvReset">↺ Par défaut</button></div>
+          <label style="margin-top:8px">Rotation du volant (°) pour l'angle affiché</label><input type="number" id="rot" min="180" max="2700" step="10"></div>
         <div><label>Synchro vidéo / télémétrie : <b id="offV">0.00 s</b></label><input type="range" id="off" min="-3" max="3" step="0.05" value="0"></div>
+        <button id="bFrame">📷 Garder cette image (photo)</button>
         <button id="bExp">🎬 Exporter avec l'overlay</button><progress id="expP" max="1" value="0" hidden></progress>
         <a id="bDl" class="hint">⬇ Télécharger la vidéo d'origine (.mp4)</a>
         <button class="dan" id="bDel">Supprimer la vidéo</button>
@@ -112,6 +124,15 @@ let ST = {}, VIDS = [], cur = null, info = null;
 const act = a => post("api/action", { action: a }).then(() => setTimeout(status, 400));
 $("bRec").onclick = () => act("rec_toggle");
 $("bBuf").onclick = () => act("buffer_toggle");
+$("bSnapH").onclick = () => { act("snap"); toast("Photo de l'écran prise (galerie Photos)"); };
+$("bFrame").onclick = async () => {
+  if (!vid.videoWidth) return; vid.pause();
+  const cv = document.createElement("canvas"); cv.width = vid.videoWidth; cv.height = vid.videoHeight; cv.getContext("2d").drawImage(vid, 0, 0);
+  const d = teleAt(vid.currentTime) || {};
+  await post("api/photo/upload", { name: "image_video", data: cv.toDataURL("image/png"), meta: { kind: "frame", game: info.game, car: info.car, track: info.track, from: cur.file,
+    tele: { speed: d.speed, gear: d.gear, pos: d.pos, cur: d.cur } } });
+  toast("Image gardée dans Photos (tu peux la retoucher en fond d'écran)");
+};
 $("bClip").onclick = () => { act("clip"); toast("Sauvegarde du replay…"); };
 let lastFile = null;
 async function status() {
@@ -119,18 +140,27 @@ async function status() {
   $("bRec").classList.toggle("on", ST.recording); $("bRec").textContent = ST.recording ? "■ Arrêter (" + mmss(ST.recFor) + ")" : "● Enregistrer";
   $("bBuf").classList.toggle("bufon", ST.buffering); $("bBuf").textContent = "Replay : " + (ST.buffering ? "ON (" + ST.bufferSec + " s)" : "OFF");
   $("bClip").disabled = !ST.buffering;
-  $("st").textContent = !ST.ffmpeg ? "⚠ ffmpeg absent : ouvre ⚙ Réglages capture" : ST.error ? "⚠ " + ST.error.slice(0, 140) : ST.recording ? "Enregistrement…" : ST.buffering ? "Replay prêt" : "Prêt";
+  $("st").textContent = !ST.ffmpeg ? "⚠ ffmpeg absent : ouvre ⚙ Réglages capture" : ST.error ? "⚠ " + ST.error.slice(0, 140) : ST.recording ? "Enregistrement…" + (ST.fpsNow ? " " + Math.round(ST.fpsNow) + " i/s" : "") : ST.buffering ? "Replay prêt" : "Prêt";
   $("st").title = ST.error || "";
   $("log").textContent = ST.error ? ST.error + "\n" + (ST.log || []).join("\n") : "";
+  if ($("cfg").style.display === "grid" || !ST.ffmpeg) { if (!ST.ffmpeg || ST.installing) { $("cfg").style.display = "grid"; } ffInfo(); }
   if (ST.lastFile !== lastFile) { if (lastFile !== null) loadLib(); lastFile = ST.lastFile; }
+}
+function ffInfo() {
+  const el = $("ffInfo");
+  if (ST.ffmpeg) { el.innerHTML = `<span class="hint">✓ ffmpeg : ${ST.ffmpeg}</span>`; return; }
+  if (ST.installing) { el.innerHTML = `<b>${ST.installing.msg}</b> ${ST.installing.pct ? ST.installing.pct + " %" : ""}<progress max="100" value="${ST.installing.pct || 0}"></progress>`; return; }
+  el.innerHTML = `<b style="color:#ff8a80">ffmpeg n'est pas installé</b> (le programme qui enregistre la vidéo).<br>
+    <button class="pri" id="bInst" style="margin:8px 0">⬇ Installer ffmpeg automatiquement</button>
+    <div class="hint">Ou à la main : gyan.dev → « ffmpeg-release-essentials.zip » → copie <b>bin\\ffmpeg.exe</b> à côté de server.py.</div>`;
+  $("bInst").onclick = async () => { await post("api/capture/install"); status(); };
 }
 function fillCfg() {
   const c = ST.cfg;
-  $("ffInfo").innerHTML = ST.ffmpeg ? `<span class="hint">ffmpeg : ${ST.ffmpeg}</span>`
-    : `<b style="color:#ff8a80">ffmpeg.exe introuvable.</b> <span class="hint">Télécharge « ffmpeg-release-essentials.zip » sur gyan.dev, et copie <b>bin\\ffmpeg.exe</b> dans le dossier RSIM (à côté de server.py), puis relance RSIM.</span>`;
+  ffInfo();
   $("cPipe").innerHTML = `<option value="auto">Automatique (la meilleure qui marche)</option>` + ST.pipes.map(p => `<option value="${p.id}">${p.label}</option>`).join("");
-  $("cPipe").value = c.pipeline; $("cFps").value = c.fps; $("cBr").value = c.bitrate; $("cMon").value = c.monitor; $("cBuf").value = c.bufferSec;
-  $("cAuto").checked = c.autoBuffer; $("cHR").value = c.hotRec; $("cHC").value = c.hotClip; $("cHB").value = c.hotBuf;
+  $("cPipe").value = c.pipeline; $("cFps").value = c.fps; $("cVfr").checked = c.vfr !== false; $("cBr").value = c.bitrate; $("cMon").value = c.monitor; $("cBuf").value = c.bufferSec;
+  $("cAuto").checked = c.autoBuffer; $("cHR").value = c.hotRec; $("cHC").value = c.hotClip; $("cHB").value = c.hotBuf; $("cHP").value = c.hotSnap || "CTRL+ALT+P";
   $("probe").textContent = ST.probe ? "Fonctionnent : " + (ST.probe.map(id => (ST.pipes.find(p => p.id === id) || {}).label || id).join(" · ") || "aucune") : "";
   fetch("api/capture/audio").then(r => r.json()).then(list => {
     $("cAudio").innerHTML = '<option value="">Pas de son</option>' + list.map(a => `<option>${a}</option>`).join("") + (c.audio && !list.includes(c.audio) ? `<option>${c.audio}</option>` : "");
@@ -144,9 +174,9 @@ $("bDiag").onclick = async () => {
 };
 $("bProbe").onclick = async () => { $("probe").textContent = "Test en cours (quelques secondes)…"; await fetch("api/capture/probe"); await status(); fillCfg(); };
 $("bCfgSave").onclick = async () => {
-  ST = await post("api/capture/config", { pipeline: $("cPipe").value, fps: +$("cFps").value, bitrate: +$("cBr").value, monitor: +$("cMon").value,
+  ST = await post("api/capture/config", { pipeline: $("cPipe").value, fps: +$("cFps").value, vfr: $("cVfr").checked, bitrate: +$("cBr").value, monitor: +$("cMon").value,
     audio: $("cAudio").value, bufferSec: +$("cBuf").value, autoBuffer: $("cAuto").checked, hotRec: $("cHR").value.toUpperCase(),
-    hotClip: $("cHC").value.toUpperCase(), hotBuf: $("cHB").value.toUpperCase() });
+    hotClip: $("cHC").value.toUpperCase(), hotBuf: $("cHB").value.toUpperCase(), hotSnap: $("cHP").value.toUpperCase() });
   toast("Réglages enregistrés (le replay redémarre au prochain lancement)"); status();
 };
 
@@ -197,7 +227,7 @@ function teleAt(t) {
   return o;
 }
 function rr(c, x, y, w, h, r) { c.beginPath(); c.roundRect(x, y, w, h, r); }
-function txt(c, s, x, y, size, col, align, weight) { c.font = (weight || 700) + " " + size + "px Rajdhani, 'Roboto Condensed', Roboto, sans-serif"; c.fillStyle = col; c.textAlign = align || "left"; c.textBaseline = "middle"; c.fillText(s, x, y); }
+function txt(c, s, x, y, size, col, align, weight) { c.font = "italic " + (weight || 900) + " " + size + "px 'Titillium Web', Rajdhani, sans-serif"; c.fillStyle = col; c.textAlign = align || "left"; c.textBaseline = "middle"; c.fillText(s, x, y); }
 function wheel(c, x, y, r, steer) {
   c.save(); c.translate(x, y); c.rotate((steer || 0) * Math.PI * 1.25);
   c.lineWidth = r * 0.22; c.strokeStyle = "#e8e8e8"; c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.stroke();
@@ -205,42 +235,112 @@ function wheel(c, x, y, r, steer) {
   c.fillStyle = "#ff3b30"; c.fillRect(-r * 0.08, -r * 1.12, r * 0.16, r * 0.26); c.restore();
 }
 function pedBar(c, x, y, w, h, v, col) { c.fillStyle = "rgba(255,255,255,0.12)"; rr(c, x, y, w, h, 6); c.fill(); c.fillStyle = col; const hh = h * Math.max(0, Math.min(1, v || 0)); rr(c, x, y + h - hh, w, hh, 6); c.fill(); }
-// overlay dessine dans un repere 1920x1080
+/* ---------- overlay telemetrie : elements a ajouter / deplacer (repere 1920x1080) ---------- */
+const OV = [  // cle, libelle, affiche par defaut, x, y, largeur, hauteur
+  ["gear", "Rapport (shifter)", true, 1470, 820, 200, 220],
+  ["speed", "Vitesse km/h", true, 1690, 820, 200, 220],
+  ["pedals", "Pédales", true, 1290, 820, 160, 220],
+  ["wheel", "Volant + angle", false, 40, 760, 280, 280],
+  ["tyres", "Pneus (chauffe)", false, 40, 40, 280, 230],
+  ["delta", "Delta", false, 810, 40, 300, 110],
+  ["lap", "Temps du tour", false, 1560, 40, 320, 130],
+  ["best", "Meilleur temps", false, 1560, 185, 320, 80],
+  ["pos", "Tour / position", false, 340, 40, 250, 110],
+  ["rpm", "Régime (LEDs)", false, 560, 975, 800, 70],
+  ["fuel", "Carburant", false, 340, 165, 250, 100],
+  ["aids", "TC / ABS / BB", false, 610, 165, 420, 80],
+];
+let OVS = (() => { try { return JSON.parse(localStorage.getItem("rsimOv")) || {}; } catch (e) { return {}; } })();
+OVS.on = OVS.on || {}; OVS.pos = OVS.pos || {}; OVS.rot = OVS.rot || 900;
+const ovOn = k => k in OVS.on ? OVS.on[k] : OV.find(o => o[0] === k)[2];
+const ovRect = o => { const p = OVS.pos[o[0]] || [o[3], o[4]]; return [p[0], p[1], o[5], o[6]]; };
+const ovSave = () => { try { localStorage.setItem("rsimOv", JSON.stringify(OVS)); } catch (e) {} };
+function ovPanel() {
+  $("ovList").innerHTML = OV.map(o => `<label><input type="checkbox" data-ov="${o[0]}" ${ovOn(o[0]) ? "checked" : ""}> ${o[1]}</label>`).join("");
+  $("ovList").querySelectorAll("[data-ov]").forEach(cb => cb.onchange = () => { OVS.on[cb.dataset.ov] = cb.checked; ovSave(); });
+  $("rot").value = OVS.rot;
+}
+$("rot").onchange = () => { OVS.rot = +$("rot").value || 900; ovSave(); };
+$("bOvReset").onclick = () => { OVS = { on: {}, pos: {}, rot: OVS.rot }; ovSave(); ovPanel(); };
+$("bMove").onclick = () => { const on = !ov.classList.contains("move"); ov.classList.toggle("move", on); $("bMove").classList.toggle("on", on);
+  $("bMove").textContent = on ? "✓ Terminer le déplacement" : "✥ Déplacer les éléments"; };
+let ovDrag = null;
+const ovPt = e => { const r = ov.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 1920, (e.clientY - r.top) / r.height * 1080]; };
+ov.addEventListener("pointerdown", e => { const [x, y] = ovPt(e);
+  for (const o of [...OV].reverse()) { if (!ovOn(o[0])) continue; const [rx, ry, rw, rh] = ovRect(o);
+    if (x >= rx && x <= rx + rw && y >= ry && y <= ry + rh) { ovDrag = { k: o[0], dx: x - rx, dy: y - ry, w: rw, h: rh }; ov.setPointerCapture(e.pointerId); return; } } });
+ov.addEventListener("pointermove", e => { if (!ovDrag) return; const [x, y] = ovPt(e);
+  OVS.pos[ovDrag.k] = [Math.round(Math.max(0, Math.min(1920 - ovDrag.w, x - ovDrag.dx))), Math.round(Math.max(0, Math.min(1080 - ovDrag.h, y - ovDrag.dy)))]; });
+ov.addEventListener("pointerup", () => { if (ovDrag) { ovDrag = null; ovSave(); } });
+
+/* panneau "course" : parallelogramme noir, liseré rouge, petit damier */
+const CHK = (() => { const o = document.createElement("canvas"); o.width = o.height = 12; const g = o.getContext("2d"); g.fillStyle = "#0a0a0a"; g.fillRect(0, 0, 12, 12);
+  g.fillStyle = "#f2f2f2"; g.fillRect(0, 0, 6, 6); g.fillRect(6, 6, 6, 6); return o; })();
+const panel = (c, x, y, w, h) => { const sk = Math.min(18, w * 0.08);
+  c.save(); c.beginPath(); c.moveTo(x + sk, y); c.lineTo(x + w, y); c.lineTo(x + w - sk, y + h); c.lineTo(x, y + h); c.closePath();
+  const g = c.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, "rgba(18,18,18,0.88)"); g.addColorStop(1, "rgba(4,4,4,0.88)"); c.fillStyle = g; c.fill();
+  c.clip(); c.fillStyle = "#e10600"; c.fillRect(x, y, w, 5);
+  c.fillStyle = c.createPattern(CHK, "repeat"); c.globalAlpha = 0.9; c.fillRect(x + w - 54, y + 5, 54, 6); c.restore(); };
+const tyreCol = t => t == null ? "#3a3f46" : t < 60 ? "#2f7bff" : t < 75 ? "#21c7e0" : t < 95 ? "#21e05d" : t < 105 ? "#ffcc00" : "#ff3b30";
+function drawShifter(c, x, y, w, h, g) {   // grille en H (1-6 + R) avec le rapport engage
+  const cols = [x + w * 0.2, x + w * 0.5, x + w * 0.8], top = y + h * 0.15, bot = y + h * 0.85, mid = (top + bot) / 2;
+  c.strokeStyle = "rgba(255,255,255,0.35)"; c.lineWidth = 4; c.beginPath();
+  cols.forEach(cx => { c.moveTo(cx, top); c.lineTo(cx, bot); }); c.moveTo(cols[0], mid); c.lineTo(cols[2], mid); c.stroke();
+  const P = { 1: [0, top], 2: [0, bot], 3: [1, top], 4: [1, bot], 5: [2, top], 6: [2, bot], 7: [2, top], 8: [2, bot] };
+  let px = (cols[0] + cols[2]) / 2, py = mid;
+  if (g > 0 && P[g]) { px = cols[P[g][0]]; py = P[g][1]; } else if (g < 0) { px = cols[2] + w * 0.12; py = bot; }
+  c.fillStyle = g < 0 ? "#ff3b30" : "#ffd400"; c.beginPath(); c.arc(px, py, w * 0.07, 0, Math.PI * 2); c.fill();
+}
 function drawOverlay(c, W, H, d, style) {
-  c.clearRect(0, 0, W, H); if (!d || style === "none") return;
+  c.clearRect(0, 0, W, H); if (!d && !ov.classList.contains("move")) return;
+  d = d || {};
   c.save(); c.scale(W / 1920, H / 1080);
-  const gear = d.gear == null ? "" : d.gear < 0 ? "R" : d.gear === 0 ? "N" : String(d.gear), fr = d.maxRpm ? Math.min(1, d.rpm / d.maxRpm) : 0;
-  const ledCol = fr > 0.94 ? "#ff2a2a" : fr > 0.85 ? "#ffcc00" : "#21e05d";
-  if (style === "dash") {
-    const x = 1440, y = 760, w = 450, h = 290;
-    c.fillStyle = "rgba(8,10,14,0.78)"; rr(c, x, y, w, h, 22); c.fill();
-    for (let i = 0; i < 12; i++) { const on = fr > 0.6 + i * 0.033; c.fillStyle = on ? (i < 5 ? "#21e05d" : i < 9 ? "#ffcc00" : "#ff2a2a") : "rgba(255,255,255,0.1)";
-      c.beginPath(); c.arc(x + 40 + i * 34, y + 30, 11, 0, Math.PI * 2); c.fill(); }
-    txt(c, gear, x + 95, y + 140, 150, fr > 0.94 ? "#ff3b30" : "#fff", "center");
-    txt(c, Math.round(d.speed || 0), x + 290, y + 110, 76, "#fff", "center"); txt(c, "km/h", x + 290, y + 160, 26, "#9aa3ad", "center", 500);
-    pedBar(c, x + 395, y + 60, 18, 150, d.clutch, "#3fd0ff"); pedBar(c, x + 420, y + 60, 18, 150, d.brake, "#ff3b30"); pedBar(c, x + 370, y + 60, 18, 150, d.throttle, "#21e05d");
-    txt(c, fmt(d.cur), x + 30, y + 245, 40, "#fff", "left");
-    if (d.delta != null) txt(c, (d.delta > 0 ? "+" : "") + d.delta.toFixed(2), x + 420, y + 245, 40, d.delta > 0 ? "#ff5a4f" : "#21e05d", "right");
-  } else if (style === "band") {
-    const y = 960; c.fillStyle = "rgba(8,10,14,0.8)"; c.fillRect(0, y, 1920, 120);
-    c.fillStyle = "rgba(255,255,255,0.12)"; c.fillRect(0, y, 1920, 10); c.fillStyle = ledCol; c.fillRect(0, y, 1920 * fr, 10);
-    txt(c, gear, 80, y + 66, 92, "#fff", "center"); txt(c, Math.round(d.speed || 0) + " km/h", 170, y + 66, 58, "#fff");
-    pedBar(c, 470, y + 25, 26, 80, d.throttle, "#21e05d"); pedBar(c, 505, y + 25, 26, 80, d.brake, "#ff3b30");
-    wheel(c, 600, y + 65, 34, d.steer);
-    txt(c, "TOUR " + (d.lap || "-") + "   P" + (d.pos || "-"), 700, y + 66, 44, "#9fd3ff");
-    txt(c, fmt(d.cur), 1060, y + 66, 58, "#fff"); txt(c, "MEILLEUR " + fmt(d.best), 1340, y + 66, 38, "#c58bff");
-    if (d.delta != null) txt(c, (d.delta > 0 ? "+" : "") + d.delta.toFixed(2), 1880, y + 66, 58, d.delta > 0 ? "#ff5a4f" : "#21e05d", "right");
-  } else if (style === "pedals") {
-    const x = 1620, y = 760; c.fillStyle = "rgba(8,10,14,0.75)"; rr(c, x, y, 270, 290, 22); c.fill();
-    wheel(c, x + 135, y + 85, 55, d.steer);
-    pedBar(c, x + 55, y + 165, 40, 105, d.clutch, "#3fd0ff"); pedBar(c, x + 115, y + 165, 40, 105, d.brake, "#ff3b30"); pedBar(c, x + 175, y + 165, 40, 105, d.throttle, "#21e05d");
+  const gear = d.gear == null ? "-" : d.gear < 0 ? "R" : d.gear === 0 ? "N" : String(d.gear), fr = d.maxRpm ? Math.min(1, (d.rpm || 0) / d.maxRpm) : 0;
+  for (const o of OV) {
+    if (!ovOn(o[0])) continue;
+    const [x, y, w, h] = ovRect(o), k = o[0];
+    if (ov.classList.contains("move")) { c.strokeStyle = "#3fd0ff"; c.lineWidth = 3; c.setLineDash([10, 8]); rr(c, x, y, w, h, 18); c.stroke(); c.setLineDash([]); }
+    if (k === "gear") { panel(c, x, y, w, h); txt(c, gear, x + w * 0.5, y + h * 0.33, 120, fr > 0.94 ? "#ff3b30" : "#fff", "center");
+      drawShifter(c, x + w * 0.15, y + h * 0.6, w * 0.7, h * 0.36, d.gear); }
+    else if (k === "speed") { panel(c, x, y, w, h); txt(c, Math.round(d.speed || 0), x + w / 2, y + h * 0.45, 96, "#fff", "center");
+      txt(c, "km/h", x + w / 2, y + h * 0.78, 34, "#9aa3ad", "center", 600); }
+    else if (k === "pedals") { panel(c, x, y, w, h); const bw = (w - 50) / 3;
+      [["clutch", "#3fd0ff", "E"], ["brake", "#ff3b30", "F"], ["throttle", "#21e05d", "G"]].forEach(([f, col, l], i) => {
+        pedBar(c, x + 15 + i * (bw + 10), y + 15, bw, h - 60, d[f], col); txt(c, l, x + 15 + i * (bw + 10) + bw / 2, y + h - 24, 26, "#9aa3ad", "center"); }); }
+    else if (k === "wheel") { panel(c, x, y, w, h);
+      const deg = (d.steer || 0) * OVS.rot / 2, cx = x + w / 2, cy = y + h * 0.58, r = w * 0.3, band = w * 0.42;
+      c.lineWidth = 14; c.strokeStyle = "rgba(255,255,255,0.12)"; c.beginPath(); c.arc(cx, cy, band, Math.PI * 1.15, Math.PI * 1.85); c.stroke();  // bande d'angle
+      const a0 = -Math.PI / 2, a1 = a0 + Math.max(-0.35, Math.min(0.35, deg / 450 * 0.35)) * Math.PI;
+      c.strokeStyle = Math.abs(deg) > 200 ? "#ff9f1c" : "#3fd0ff"; c.beginPath(); c.arc(cx, cy, band, Math.min(a0, a1), Math.max(a0, a1)); c.stroke();
+      c.fillStyle = "#fff"; c.fillRect(cx - 2, cy - band - 12, 4, 24);
+      wheel(c, cx, cy, r, deg / 225); txt(c, Math.round(deg) + "°", cx, y + 26, 30, "#fff", "center"); }
+    else if (k === "tyres") { panel(c, x, y, w, h); const T = d.tyreT || [], bw = (w - 45) / 2, bh = (h - 45) / 2;
+      ["AVG", "AVD", "ARG", "ARD"].forEach((l, i) => { const bx = x + 15 + (i % 2) * (bw + 15), by = y + 15 + Math.floor(i / 2) * (bh + 15);
+        c.fillStyle = tyreCol(T[i]); rr(c, bx, by, bw, bh, 12); c.fill();
+        txt(c, T[i] == null ? "--" : Math.round(T[i]) + "°", bx + bw / 2, by + bh * 0.45, 44, "#08090b", "center");
+        txt(c, l, bx + bw / 2, by + bh * 0.82, 20, "rgba(0,0,0,0.6)", "center"); }); }
+    else if (k === "delta") { panel(c, x, y, w, h); const v = d.delta;
+      txt(c, v == null ? "--.--" : (v > 0 ? "+" : "") + v.toFixed(2), x + w / 2, y + h / 2, 70, v == null ? "#9aa3ad" : v > 0 ? "#ff5a4f" : "#21e05d", "center"); }
+    else if (k === "lap") { panel(c, x, y, w, h); txt(c, fmt(d.cur), x + w - 20, y + h * 0.36, 58, "#fff", "right");
+      txt(c, "DERNIER " + fmt(d.last), x + w - 20, y + h * 0.78, 30, "#9aa3ad", "right"); }
+    else if (k === "best") { panel(c, x, y, w, h); txt(c, "MEILLEUR " + fmt(d.best), x + w - 20, y + h / 2, 36, "#c58bff", "right"); }
+    else if (k === "pos") { panel(c, x, y, w, h); txt(c, "P" + (d.pos || "-"), x + 25, y + h / 2, 64, "#fff");
+      txt(c, "TOUR " + (d.lap || "-"), x + w - 20, y + h / 2, 36, "#9fd3ff", "right"); }
+    else if (k === "rpm") { panel(c, x, y, w, h); const n = 20;
+      for (let i = 0; i < n; i++) { const on = fr > 0.55 + i * 0.022; c.fillStyle = on ? (i < 8 ? "#21e05d" : i < 15 ? "#ffcc00" : "#ff2a2a") : "rgba(255,255,255,0.1)";
+        rr(c, x + 15 + i * (w - 30) / n, y + 15, (w - 30) / n - 8, h - 30, 6); c.fill(); } }
+    else if (k === "fuel") { panel(c, x, y, w, h); txt(c, (d.fuel == null ? "--" : d.fuel.toFixed(1)) + " L", x + 20, y + h * 0.38, 44, "#fff");
+      txt(c, d.fuelLaps == null ? "" : d.fuelLaps.toFixed(1) + " tours", x + 20, y + h * 0.75, 28, "#9aa3ad"); }
+    else if (k === "aids") { panel(c, x, y, w, h);
+      [["TC", d.tc], ["ABS", d.abs], ["BB", d.bb == null ? null : d.bb.toFixed(1)]].forEach(([l, v], i) =>
+        txt(c, l + " " + (v == null ? "-" : v), x + 25 + i * (w - 30) / 3, y + h / 2, 34, "#fff")); }
   }
   c.restore();
 }
 function sizeOv() { const r = vid.getBoundingClientRect(); const dpr = devicePixelRatio || 1;
   if (ov.width !== Math.round(r.width * dpr)) { ov.width = Math.round(r.width * dpr); ov.height = Math.round(r.height * dpr); } }
 function loop() {
-  if (info) { sizeOv(); drawOverlay(octx, ov.width, ov.height, teleAt(vid.currentTime), $("oStyle").value); drawStripHead(); }
+  if (info) { sizeOv(); drawOverlay(octx, ov.width, ov.height, teleAt(vid.currentTime)); drawStripHead(); }
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
@@ -277,9 +377,9 @@ $("bExp").onclick = async () => {
   const type = types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)); if (!type) return toast("Export non supporté par ce navigateur");
   const recd = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: (ST.cfg && ST.cfg.bitrate || 30) * 1e6 }), chunks = [];
   recd.ondataavailable = e => e.data.size && chunks.push(e.data);
-  const style = $("oStyle").value === "none" ? "dash" : $("oStyle").value, p = $("expP"); p.hidden = false; $("bExp").disabled = true;
+  const p = $("expP"); ov.classList.remove("move"); p.hidden = false; $("bExp").disabled = true;
   let run = true;
-  const draw = () => { if (!run) return; c.drawImage(vid, 0, 0, W, H); drawOverlay(o, W, H, teleAt(vid.currentTime), style); c.drawImage(oc, 0, 0);
+  const draw = () => { if (!run) return; c.drawImage(vid, 0, 0, W, H); drawOverlay(o, W, H, teleAt(vid.currentTime)); c.drawImage(oc, 0, 0);
     p.value = vid.currentTime / vid.duration; vid.requestVideoFrameCallback ? vid.requestVideoFrameCallback(draw) : requestAnimationFrame(draw); };
   vid.pause(); vid.currentTime = 0; await new Promise(r => vid.onseeked = r); vid.onseeked = null;
   recd.start(500); vid.play(); draw(); toast("Export en cours : laisse la vidéo jouer jusqu'au bout");
@@ -290,6 +390,7 @@ $("bExp").onclick = async () => {
   p.hidden = true; $("bExp").disabled = false; toast("Export terminé");
 };
 
+ovPanel();
 status().then(loadLib); setInterval(status, 1000);
 const q = new URLSearchParams(location.search).get("v"); if (q) setTimeout(() => openVid(q), 600);
 </script>

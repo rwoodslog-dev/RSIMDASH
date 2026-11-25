@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060606">
+<link rel="icon" href="icon-192.png">
+<title>RSIM · Montage TikTok</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; color:#f4f4f4; font:14px/1.4 sans-serif; }
+  header { display:flex; align-items:center; gap:10px; padding:12px 18px; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:20px; }
+  input, select, button, textarea { font:inherit; padding:6px 10px; color:inherit; }
+  button { cursor:pointer; }
+  main { display:grid; grid-template-columns: 380px minmax(0, 1fr) 360px; gap:14px; padding:14px 18px; }
+  @media (max-width:1200px) { main { grid-template-columns: 1fr; } }
+  .panel { padding:12px; display:grid; gap:9px; align-content:start; }
+  .panel label { font-size:12px; color:#9b9b9b; display:block; margin-bottom:3px; }
+  .panel select, .panel input:not([type=checkbox]):not([type=range]) { width:100%; }
+  .vids { display:grid; gap:6px; max-height:52vh; overflow:auto; }
+  .panel label.vrow, .vrow { display:grid; grid-template-columns: 22px 96px 1fr; gap:8px; align-items:center; padding:6px; cursor:pointer; }
+  .vrow img { width:96px; aspect-ratio:16/9; object-fit:cover; background:#000; display:block; }
+  .vrow small { display:block; color:#9b9b9b; }
+  .prev { display:flex; justify-content:center; align-items:flex-start; }
+  #cv { height:78vh; aspect-ratio:9/16; background:#000; box-shadow:0 0 0 1px #333, 0 14px 50px #000; }
+  .seg { display:grid; grid-template-columns: 1fr auto; gap:6px; font-size:12px; padding:5px 8px; }
+  #segs { display:grid; gap:4px; max-height:30vh; overflow:auto; }
+  .sec { font-weight:900; font-style:italic; text-transform:uppercase; letter-spacing:1px; color:#fff; border-bottom:2px solid #e10600; padding-bottom:3px; margin-top:4px; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  progress { width:100%; }
+  .toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); padding:8px 16px; display:none; z-index:9; }
+  .hint { font-size:12px; color:#9b9b9b; }
+  .chk { display:flex !important; gap:6px; align-items:center; color:#f4f4f4 !important; font-size:13px !important; }
+</style>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<header>
+  <a href="index.html?home">⌂ Menu</a><h1>Galerie</h1>
+</header>
+<nav class="gnav"><a href="videos.html">🎥 Vidéos</a><a href="photos.html">🖼 Photos</a><a href="montage.html" class="on">🎬 Montage TikTok</a></nav>
+<main>
+  <div class="panel card">
+    <div class="sec">1 · Choisis tes vidéos</div>
+    <div class="vids" id="vids"></div>
+    <div class="hint">L'ordre de coche = l'ordre du montage. Les meilleurs passages (vitesse, gros freinages, coups de volant) sont repérés grâce à la télémétrie.</div>
+  </div>
+  <div class="prev"><canvas id="cv" width="1080" height="1920"></canvas></div>
+  <div class="panel card">
+    <div class="sec">2 · Style</div>
+    <div class="row2">
+      <div><label>Durée</label><select id="dur"><option value="15">15 s</option><option value="30" selected>30 s</option><option value="45">45 s</option><option value="60">60 s</option></select></div>
+      <div><label>Rythme</label><select id="sty"><option value="hype">Hype (coupes rapides)</option><option value="cine">Cinématique</option><option value="onboard">Onboard (longs passages)</option></select></div>
+    </div>
+    <div class="row2">
+      <div><label>Cadrage 9:16</label><select id="frame"><option value="blur">Vidéo entière + fond flou</option><option value="cover">Plein écran (recadré)</option></select></div>
+      <div><label>Couleurs</label><select id="look"><option value="none">Normales</option><option value="punch" selected>Punchy</option><option value="cine">Cinéma</option><option value="bwred">N&B + rouge</option></select></div>
+    </div>
+    <div><label>Titre</label><input id="title" placeholder="Ex : SPA EN GT3 · 2:17.8"></div>
+    <div><label>Ton pseudo TikTok (fin de vidéo)</label><input id="handle" placeholder="@rsim"></div>
+    <label class="chk"><input type="checkbox" id="tele" checked> Télémétrie à l'écran (vitesse, rapport, pédales, delta)</label>
+    <label class="chk"><input type="checkbox" id="flash" checked> Flash + zoom à chaque coupe</label>
+    <label class="chk"><input type="checkbox" id="intro" checked> Intro (titre sur damier) et fin</label>
+    <div><label>Musique (fichier MP3 de ton téléphone / PC, facultatif)</label><input type="file" id="music" accept="audio/*"></div>
+    <div class="row2"><div><label>Volume musique</label><input type="range" id="vMus" min="0" max="1" step="0.05" value="0.8"></div>
+      <div><label>Son du jeu</label><input type="range" id="vGame" min="0" max="1" step="0.05" value="0.5"></div></div>
+    <div class="sec">3 · Montage</div>
+    <button id="bPlan">🎲 Choisir les passages</button>
+    <div id="segs"></div>
+    <button class="pri" id="bGo">🎬 Créer la vidéo</button>
+    <progress id="prog" max="1" value="0" hidden></progress>
+    <div class="hint" id="info">La vidéo se fabrique en temps réel (une vidéo de 30 s prend 30 s). Laisse l'onglet ouvert.</div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script src="api.js"></script>
+<script>
+"use strict";
+if (RSIMAPI.needsSetup) location.href = "settings.html?first=1";
+const $ = id => document.getElementById(id);
+const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 2600); };
+const media = f => RSIMAPI.url("media/" + encodeURIComponent(f));
+let VIDS = [], order = [], INFO = {}, SEGS = [];
+const W = 1080, H = 1920, cv = $("cv"), c = cv.getContext("2d");
+
+async function load() {
+  VIDS = (await (await fetch("api/videos")).json()).filter(v => !v.recording && v.file.endsWith(".mp4"));
+  const box = $("vids"); box.innerHTML = VIDS.length ? "" : '<p class="hint">Aucune vidéo. Enregistre d\'abord dans « Vidéos ».</p>';
+  VIDS.forEach(v => { const el = document.createElement("label"); el.className = "vrow card";
+    el.innerHTML = `<input type="checkbox"><img src="${v.thumb ? media(v.file.replace(/\.mp4$/, ".jpg")) : ""}"><div><b>${v.car || v.game || v.file}</b>
+      <small>${v.track || ""} · ${Math.round(v.duration || 0)} s · ${v.kind === "clip" ? "replay" : "vidéo"}</small></div>`;
+    el.querySelector("input").onchange = e => { order = order.filter(f => f !== v.file); if (e.target.checked) order.push(v.file); SEGS = []; showSegs(); };
+    box.appendChild(el); });
+  idle();
+}
+async function info(f) { if (!INFO[f]) { INFO[f] = await (await fetch("api/video?f=" + encodeURIComponent(f))).json(); INFO[f].tele = INFO[f].tele || []; } return INFO[f]; }
+
+/* ---------- choix automatique des meilleurs passages ---------- */
+async function plan() {
+  if (!order.length) return toast("Coche au moins une vidéo");
+  const total = +$("dur").value - ($("intro").checked ? 3.2 : 0), segLen = { hype: 1.9, cine: 3.6, onboard: 5.5 }[$("sty").value];
+  const infos = await Promise.all(order.map(info)), durs = infos.map((i, k) => i.duration || (VIDS.find(v => v.file === order[k]) || {}).duration || 10);
+  const sumD = durs.reduce((a, b) => a + b, 0); SEGS = [];
+  infos.forEach((inf, k) => {
+    const share = Math.max(segLen, total * durs[k] / sumD), n = Math.max(1, Math.round(share / segLen)), D = durs[k];
+    const step = 0.5, nb = Math.max(1, Math.floor(D / step)), score = new Float32Array(nb);
+    const T = inf.tele, off = inf.offset || 0;
+    if (T.length > 10) {
+      const vmax = Math.max(50, ...T.map(x => x[1].speed || 0));
+      for (let i = 1; i < T.length; i++) { const [t, d] = T[i], p = T[i - 1][1], b = Math.floor((t - off) / step); if (b < 0 || b >= nb) continue;
+        score[b] += (d.speed || 0) / vmax * 0.3 + (d.brake || 0) * 0.9 + Math.abs((d.steer || 0) - (p.steer || 0)) * 8 + (d.gear !== p.gear ? 0.6 : 0); }
+    } else for (let b = 0; b < nb; b++) score[b] = 1 + Math.sin(b * 1.7) * 0.2;   // pas de telemetrie : passages repartis
+    const win = Math.max(1, Math.round(segLen / step)), picks = [];
+    const used = new Uint8Array(nb);
+    for (let s = 0; s < n; s++) {
+      let best = -1, bi = -1;
+      for (let i = 0; i + win <= nb; i++) { let ok = true, sc = 0; for (let j = i; j < i + win; j++) { if (used[j]) { ok = false; break; } sc += score[j]; } if (ok && sc > best) { best = sc; bi = i; } }
+      if (bi < 0) break;
+      for (let j = Math.max(0, bi - 2); j < Math.min(nb, bi + win + 2); j++) used[j] = 1;
+      picks.push(bi * step);
+    }
+    picks.sort((a, b) => a - b).forEach(st => SEGS.push({ f: order[k], a: Math.max(0, st), b: Math.min(D - 0.05, st + segLen) }));
+  });
+  // ajuste a la duree visee
+  let sum = SEGS.reduce((a, s) => a + s.b - s.a, 0);
+  while (sum > total + 0.5 && SEGS.length > 1) { const s = SEGS.splice(SEGS.length > 2 ? 1 + Math.floor(Math.random() * (SEGS.length - 2)) : 1, 1)[0]; sum -= s.b - s.a; }
+  showSegs();
+}
+function showSegs() {
+  const box = $("segs"); const tot = SEGS.reduce((a, s) => a + s.b - s.a, 0) + ($("intro").checked && SEGS.length ? 3.2 : 0);
+  box.innerHTML = SEGS.map((s, i) => `<div class="seg card"><span>${i + 1}. ${(VIDS.find(v => v.file === s.f) || {}).car || s.f} · ${s.a.toFixed(1)} → ${s.b.toFixed(1)} s</span>
+    <button class="dan" data-x="${i}" style="padding:2px 8px">✕</button></div>`).join("") + (SEGS.length ? `<div class="hint">Total ≈ ${tot.toFixed(1)} s</div>` : "");
+  box.querySelectorAll("[data-x]").forEach(b => b.onclick = () => { SEGS.splice(+b.dataset.x, 1); showSegs(); });
+}
+$("bPlan").onclick = plan;
+
+/* ---------- dessin ---------- */
+const CHK = (() => { const o = document.createElement("canvas"); o.width = o.height = 40; const g = o.getContext("2d"); g.fillStyle = "#0a0a0a"; g.fillRect(0, 0, 40, 40);
+  g.fillStyle = "#f2f2f2"; g.fillRect(0, 0, 20, 20); g.fillRect(20, 20, 20, 20); return o; })();
+const FONT = (s, w) => `italic ${w || 900} ${s}px 'Titillium Web', Rajdhani, sans-serif`;
+function T(s, x, y, size, col, align, w) { c.font = FONT(size, w); c.fillStyle = col; c.textAlign = align || "left"; c.textBaseline = "middle"; c.fillText(s, x, y); }
+function slant(x, y, w, h, col) { c.fillStyle = col; c.beginPath(); c.moveTo(x + h * 0.3, y); c.lineTo(x + w, y); c.lineTo(x + w - h * 0.3, y + h); c.lineTo(x, y + h); c.fill(); }
+const fmt = t => t == null ? "--:--" : Math.floor(t / 60) + ":" + (t % 60).toFixed(1).padStart(4, "0");
+function lookFilter() { return { none: "none", punch: "contrast(1.18) saturate(1.3)", cine: "contrast(1.12) saturate(.85) sepia(.15)", bwred: "grayscale(1) contrast(1.35)" }[$("look").value]; }
+function idle() { c.fillStyle = "#060606"; c.fillRect(0, 0, W, H); c.fillStyle = c.createPattern(CHK, "repeat"); c.globalAlpha = .12; c.fillRect(0, 0, W, H); c.globalAlpha = 1;
+  slant(90, 820, 900, 140, "#e10600"); T("MONTAGE RSIM", 540, 890, 92, "#fff", "center"); T("Coche des vidéos puis « Choisir les passages »", 540, 1030, 34, "#bbb", "center", 600); }
+function card(t, title, sub, outro) {   // intro / fin
+  c.fillStyle = "#060606"; c.fillRect(0, 0, W, H);
+  c.save(); c.translate(W / 2, H / 2); c.rotate(-0.25); c.fillStyle = c.createPattern(CHK, "repeat"); c.globalAlpha = 0.9;
+  c.fillRect(-W, -H * 0.18 + Math.sin(t * 2) * 10, W * 2, 160); c.fillRect(-W, H * 0.12, W * 2, 60); c.restore();
+  const k = Math.min(1, t / 0.35), x = -900 + 990 * (1 - (1 - k) ** 3);
+  slant(x, 1180, 980, 170, "#e10600"); T(title || (outro ? "RSIM" : "RSIM"), x + 70, 1265, title && title.length > 16 ? 70 : 104, "#fff");
+  if (sub) T(sub, x + 80, 1420, 52, "#fff", "left", 700);
+}
+function teleAt(inf, t) {
+  const A = inf.tele; if (!A.length) return null; t += inf.offset || 0;
+  let lo = 0, hi = A.length - 1; if (t <= A[0][0]) return A[0][1]; if (t >= A[hi][0]) return A[hi][1];
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (A[m][0] <= t) lo = m; else hi = m; } return A[lo][1];
+}
+function drawFrame(v, inf, cutT, now) {
+  const vw = v.videoWidth || 16, vh = v.videoHeight || 9, since = now - cutT, punch = $("flash").checked ? Math.max(0, 1 - since / 0.35) : 0;
+  c.save(); c.filter = lookFilter();
+  if ($("frame").value === "cover") {
+    const z = 1 + punch * 0.12, sh = vh, sw = vh * 9 / 16 / z, sx = (vw - sw) / 2; c.drawImage(v, sx, (vh - sh / z) / 2, sw, sh / z, 0, 0, W, H);
+  } else {
+    const s = H / vh * 1.05; c.filter = lookFilter() + " blur(28px) brightness(.55)"; c.drawImage(v, (W - vw * s) / 2, 0, vw * s, H);
+    c.filter = lookFilter(); const z = 1.08 + punch * 0.1, dw = W * z, dh = dw * vh / vw; c.drawImage(v, (W - dw) / 2, (H - dh) / 2 - 40, dw, dh);
+  }
+  c.restore();
+  if ($("look").value === "bwred") { c.fillStyle = "rgba(225,6,0,.12)"; c.fillRect(0, 0, W, H); }
+  // titre en haut
+  const t = $("title").value.trim();
+  if (t) { slant(40, 150, Math.min(1000, 60 + t.length * 38), 110, "#e10600"); T(t.toUpperCase(), 90, 207, t.length > 22 ? 52 : 64, "#fff"); }
+  c.fillStyle = c.createPattern(CHK, "repeat"); c.fillRect(0, 0, W, 18);
+  // telemetrie
+  const d = $("tele").checked ? teleAt(inf, v.currentTime) : null;
+  if (d) {
+    const y = 1440; c.fillStyle = "rgba(6,6,6,.82)"; c.beginPath(); c.moveTo(60, y); c.lineTo(1020, y); c.lineTo(990, y + 250); c.lineTo(30, y + 250); c.fill();
+    c.fillStyle = "#e10600"; c.fillRect(60, y, 960, 8);
+    const g = d.gear == null ? "-" : d.gear < 0 ? "R" : d.gear === 0 ? "N" : d.gear;
+    T(String(g), 150, y + 130, 170, "#fff", "center"); T(Math.round(d.speed || 0), 470, y + 115, 120, "#fff", "center"); T("KM/H", 470, y + 200, 36, "#e10600", "center");
+    [["throttle", "#21e05d"], ["brake", "#e10600"]].forEach(([k, col], i) => { const x = 640 + i * 60, h = 190, v2 = Math.max(0, Math.min(1, d[k] || 0));
+      c.fillStyle = "rgba(255,255,255,.12)"; c.fillRect(x, y + 35, 40, h); c.fillStyle = col; c.fillRect(x, y + 35 + h * (1 - v2), 40, h * v2); });
+    if (d.delta != null) T((d.delta > 0 ? "+" : "") + d.delta.toFixed(2), 960, y + 90, 58, d.delta > 0 ? "#ff4d42" : "#21e05d", "right");
+    T(fmt(d.cur), 960, y + 180, 50, "#fff", "right", 700);
+    const fr = d.maxRpm ? Math.min(1, (d.rpm || 0) / d.maxRpm) : 0;
+    for (let i = 0; i < 16; i++) { c.fillStyle = fr > 0.55 + i * 0.028 ? (i < 6 ? "#21e05d" : i < 12 ? "#ffd400" : "#e10600") : "rgba(255,255,255,.1)"; c.fillRect(70 + i * 58, y - 40, 48, 22); }
+  }
+  // logo
+  const s = 26; for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) { c.fillStyle = (i + j) % 2 ? "#0a0a0a" : "#f4f4f4"; c.fillRect(W - 300 + i * s / 2, 300 + j * s / 2, s / 2, s / 2); }
+  T("RSIM", W - 300 + s * 3.4, 300 + s / 2, 42, "#fff");
+  if (punch && $("flash").checked) { c.fillStyle = `rgba(255,255,255,${Math.max(0, 1 - since / 0.12) * 0.8})`; c.fillRect(0, 0, W, H); }
+}
+
+/* ---------- fabrication ---------- */
+$("bGo").onclick = async () => {
+  if (!SEGS.length) await plan(); if (!SEGS.length) return;
+  $("bGo").disabled = true; const prog = $("prog"); prog.hidden = false;
+  const ac = new AudioContext(), dest = ac.createMediaStreamDestination();
+  const v = document.createElement("video"); v.crossOrigin = "anonymous"; v.playsInline = true; v.preload = "auto";
+  const gv = ac.createGain(); gv.gain.value = +$("vGame").value; ac.createMediaElementSource(v).connect(gv).connect(dest);
+  let mus = null;
+  if ($("music").files[0]) { mus = new Audio(URL.createObjectURL($("music").files[0])); mus.loop = true;
+    const gm = ac.createGain(); gm.gain.value = +$("vMus").value; ac.createMediaElementSource(mus).connect(gm).connect(dest); }
+  const stream = cv.captureStream(30); dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+  const types = ["video/mp4;codecs=avc1.640028,mp4a.40.2", "video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"];
+  const type = types.find(t => MediaRecorder.isTypeSupported(t)), chunks = [];
+  const rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 16e6, audioBitsPerSecond: 192e3 });
+  rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+  const total = SEGS.reduce((a, s) => a + s.b - s.a, 0) + ($("intro").checked ? 3.2 : 0); let done = 0;
+  const sleepDraw = (sec, fn) => new Promise(r => { const t0 = performance.now(); const tick = () => { const t = (performance.now() - t0) / 1000; fn(t); prog.value = (done + t) / total;
+    if (t < sec) requestAnimationFrame(tick); else { done += sec; r(); } }; tick(); });
+  rec.start(250); if (mus) mus.play();
+  if ($("intro").checked) await sleepDraw(1.4, t => card(t, $("title").value.trim().toUpperCase() || "RSIM", (VIDS.find(x => x.file === SEGS[0].f) || {}).track));
+  for (const s of SEGS) {
+    const inf = await info(s.f);
+    rec.pause(); if (mus) mus.pause();
+    if (!v.src.endsWith(encodeURIComponent(s.f))) { v.src = media(s.f); await new Promise(r => v.onloadeddata = r); }
+    v.currentTime = s.a; await new Promise(r => v.onseeked = r);
+    await v.play(); rec.resume(); if (mus) mus.play();
+    const cut = performance.now() / 1000;
+    await new Promise(r => { const tick = () => { drawFrame(v, inf, cut, performance.now() / 1000); prog.value = (done + v.currentTime - s.a) / total;
+      if (v.currentTime >= s.b || v.ended) { v.pause(); r(); } else (v.requestVideoFrameCallback ? v.requestVideoFrameCallback(tick) : requestAnimationFrame(tick)); }; tick(); });
+    done += s.b - s.a;
+  }
+  if ($("intro").checked) await sleepDraw(1.8, t => card(t, ($("handle").value.trim() || "RSIM").toUpperCase(), "SIM RACING", true));
+  rec.stop(); await new Promise(r => rec.onstop = r); if (mus) mus.pause(); ac.close();
+  const blob = new Blob(chunks, { type }), ext = type.includes("mp4") ? "mp4" : "webm", name = "RSIM_tiktok_" + Date.now() + "." + ext;
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  try { await fetch("api/video/upload?name=" + name, { method: "POST", body: blob }); toast("Montage terminé : téléchargé + rangé dans Vidéos"); } catch (e) { toast("Montage téléchargé"); }
+  prog.hidden = true; $("bGo").disabled = false;
+};
+document.fonts && document.fonts.ready.then(idle);
+load();
+</script>
+</body>
+</html>

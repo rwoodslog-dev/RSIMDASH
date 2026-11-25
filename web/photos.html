@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060606">
+<link rel="icon" href="icon-192.png">
+<title>RSIM · Photos</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; color:#f4f4f4; font:14px/1.4 sans-serif; }
+  header { display:flex; align-items:center; gap:10px; padding:12px 18px; flex-wrap:wrap; }
+  header h1 { margin:0; font-size:20px; }
+  input, select, button { font:inherit; padding:6px 10px; color:inherit; }
+  button { cursor:pointer; }
+  main { padding:14px 18px; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:10px; }
+  .ph { cursor:pointer; overflow:hidden; }
+  .ph img { width:100%; aspect-ratio:16/9; object-fit:cover; display:block; background:#000; }
+  .ph .i { padding:7px 10px; } .ph small { display:block; }
+  #ed { display:none; }
+  .edw { display:grid; grid-template-columns: minmax(0, 1fr) 340px; gap:14px; }
+  @media (max-width:1000px) { .edw { grid-template-columns: 1fr; } }
+  .stage { background:#000 repeating-conic-gradient(#141414 0 25%, #0b0b0b 0 50%) 0 0 / 24px 24px; display:flex; align-items:center; justify-content:center;
+    min-height:60vh; position:relative; overflow:hidden; }
+  #pv { max-width:100%; max-height:76vh; display:block; touch-action:none; cursor:grab; box-shadow:0 0 0 1px #333, 0 10px 40px #000; }
+  .panel { padding:12px; display:grid; gap:9px; align-content:start; max-height:84vh; overflow:auto; }
+  .panel label { font-size:12px; color:#9b9b9b; display:flex; justify-content:space-between; }
+  .panel input[type=range] { width:100%; padding:0; }
+  .presets { display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; }
+  .presets button { font-size:11px; padding:6px 4px; }
+  .sec { font-weight:900; font-style:italic; text-transform:uppercase; letter-spacing:1px; margin-top:6px; color:#fff; border-bottom:2px solid #e10600; padding-bottom:3px; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .toast { position:fixed; bottom:16px; left:50%; transform:translateX(-50%); padding:8px 16px; display:none; z-index:9; }
+  .hint { font-size:12px; }
+  #busy { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.6); font-weight:900; font-style:italic; text-transform:uppercase; }
+</style>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<header>
+  <a href="index.html?home">⌂ Menu</a><h1>Galerie</h1>
+  <button class="pri" id="bSnap">📷 Photo de l'écran</button>
+  <button id="bImp">⬆ Importer</button><input type="file" id="fImp" accept="image/*" multiple hidden>
+  <span class="hint">Raccourci en jeu : <b id="hk">Ctrl+Alt+P</b> · ou un bouton du volant / de la button box</span>
+</header>
+<nav class="gnav"><a href="videos.html">🎥 Vidéos</a><a href="photos.html" class="on">🖼 Photos</a><a href="montage.html">🎬 Montage TikTok</a></nav>
+<main>
+  <div id="lib"><div class="grid" id="grid"></div></div>
+  <div id="ed">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <button id="bBack">← Galerie</button><b id="edName"></b>
+      <span style="margin-left:auto"></span>
+      <button id="bSave" class="pri">💾 Enregistrer dans la galerie</button><button id="bDl">⬇ Télécharger</button><button class="dan" id="bDel">Supprimer l'original</button>
+    </div>
+    <div class="edw">
+      <div class="stage"><canvas id="pv"></canvas><div id="busy">Rendu en cours…</div></div>
+      <div class="panel">
+        <div class="sec">Format (fond d'écran)</div>
+        <div class="row2"><select id="fmt"></select><select id="res"></select></div>
+        <label>Zoom <b id="vzoom">1.00</b></label><input type="range" id="zoom" min="1" max="3" step="0.01" value="1">
+        <div class="hint">Glisse l'image pour cadrer.</div>
+        <div class="sec">Styles</div>
+        <div class="presets" id="presets"></div>
+        <div class="sec">Réglages</div>
+        <div id="sliders"></div>
+        <div class="sec">Texte</div>
+        <input id="tTitle" placeholder="Titre (ex : SPA · GT3)">
+        <div class="row2"><label style="color:inherit"><input type="checkbox" id="tTele"> Infos télémétrie</label><label style="color:inherit"><input type="checkbox" id="tLogo" checked> Logo RSIM</label></div>
+        <button id="bReset">↺ Tout remettre à zéro</button>
+      </div>
+    </div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+<script src="api.js"></script>
+<script>
+"use strict";
+if (RSIMAPI.needsSetup) location.href = "settings.html?first=1";
+const $ = id => document.getElementById(id);
+const toast = m => { const t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = "none", 2400); };
+const post = (u, b) => fetch(u, { method: "POST", body: JSON.stringify(b || {}) }).then(r => r.json());
+const purl = f => RSIMAPI.url("photo/" + encodeURIComponent(f));
+let PH = [], cur = null, img = null;
+
+/* ---------------- galerie ---------------- */
+async function loadLib() {
+  PH = await (await fetch("api/photos")).json();
+  const g = $("grid"); g.innerHTML = PH.length ? "" : '<p class="hint">Aucune photo. « 📷 Photo de l\'écran » (ou Ctrl+Alt+P en jeu), « ⬆ Importer », ou « 📷 Garder cette image » en regardant une vidéo.</p>';
+  PH.forEach(p => { const el = document.createElement("div"); el.className = "ph card";
+    const d = new Date((p.at || p.mtime) * 1000);
+    el.innerHTML = `<img loading="lazy" src="${purl(p.thumb || p.file)}"><div class="i"><b>${p.car || p.game || (p.kind === "edit" ? "Retouche" : "Photo")}</b>
+      <small>${p.track || ""} ${d.toLocaleDateString()} ${d.toLocaleTimeString().slice(0, 5)}</small></div>`;
+    el.onclick = () => openEd(p); g.appendChild(el); });
+}
+$("bSnap").onclick = async () => { await post("api/action", { action: "snap" }); toast("Photo prise"); setTimeout(loadLib, 1500); };
+$("bImp").onclick = () => $("fImp").click();
+$("fImp").onchange = async e => {
+  for (const f of e.target.files) { const data = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); });
+    await post("api/photo/upload", { name: f.name, data, meta: { kind: "import" } }); }
+  e.target.value = ""; loadLib(); toast("Importé");
+};
+
+/* ---------------- editeur ---------------- */
+const FORMATS = {
+  orig: ["Original", 0, [["Taille d'origine", 0, 0]]],
+  desk: ["Bureau 16:9", 16 / 9, [["2560 × 1440", 2560, 1440], ["1920 × 1080", 1920, 1080], ["3840 × 2160 (4K)", 3840, 2160]]],
+  uw: ["Ultrawide 21:9", 43 / 18, [["3440 × 1440", 3440, 1440], ["2560 × 1080", 2560, 1080]]],
+  phone: ["Téléphone 20:9", 9 / 20, [["1080 × 2400", 1080, 2400], ["1440 × 3200", 1440, 3200]]],
+  story: ["Story / TikTok 9:16", 9 / 16, [["1080 × 1920", 1080, 1920]]],
+  sq: ["Carré 1:1", 1, [["2048 × 2048", 2048, 2048], ["1080 × 1080", 1080, 1080]]],
+};
+const SL = [  // cle, libelle, min, max
+  ["exposure", "Exposition", -100, 100], ["contrast", "Contraste", -100, 100], ["highlights", "Hautes lumières", -100, 100],
+  ["shadows", "Ombres", -100, 100], ["clarity", "HDR / clarté", 0, 100], ["sharpen", "Netteté", 0, 100],
+  ["saturation", "Saturation", -100, 100], ["vibrance", "Vibrance", -100, 100], ["temp", "Température", -100, 100], ["tint", "Teinte", -100, 100],
+  ["redpop", "Rouge seul (le reste en N&B)", 0, 100], ["bw", "Noir & blanc", 0, 100], ["glow", "Halo lumineux", 0, 100],
+  ["fade", "Délavé", 0, 100], ["vignette", "Vignettage", 0, 100], ["grain", "Grain", 0, 100],
+];
+const ZERO = Object.fromEntries(SL.map(s => [s[0], 0]));
+const PRESETS = {
+  "Naturel": {}, "HDR": { clarity: 55, shadows: 35, highlights: -40, vibrance: 25, sharpen: 25, contrast: 10 },
+  "HDR extrême": { clarity: 95, shadows: 60, highlights: -60, vibrance: 45, saturation: 10, sharpen: 45, contrast: 20, vignette: 30 },
+  "Cinéma": { contrast: 20, temp: 18, tint: -6, saturation: -15, fade: 20, vignette: 45, highlights: -20, clarity: 20 },
+  "Noir & Rouge": { redpop: 100, contrast: 35, clarity: 40, vignette: 40, sharpen: 20 },
+  "N&B course": { bw: 100, contrast: 45, clarity: 50, grain: 25, vignette: 35 },
+  "Néon nuit": { temp: -35, tint: 18, saturation: 35, glow: 55, contrast: 25, shadows: -15, vignette: 40 },
+  "Vintage": { fade: 45, temp: 25, saturation: -25, grain: 40, vignette: 35, contrast: -10 },
+  "Dramatique": { contrast: 50, clarity: 70, shadows: -10, highlights: -45, saturation: -10, vignette: 60, sharpen: 30 },
+  "Pastel": { exposure: 15, contrast: -25, fade: 35, saturation: -10, vibrance: 20, temp: 8 },
+  "Coucher de soleil": { temp: 45, tint: 10, saturation: 20, glow: 35, highlights: -20, vignette: 30 },
+  "Racing rouge": { contrast: 35, saturation: 15, temp: 12, tint: 10, clarity: 45, vignette: 50, redpop: 35 },
+};
+let P = { ...ZERO }, fmt = "desk", resI = 0, zoom = 1, pan = [0, 0];
+
+async function openEd(p) {
+  cur = p; $("lib").style.display = "none"; $("ed").style.display = "block"; $("edName").textContent = p.car || p.file;
+  img = new Image(); img.crossOrigin = "anonymous"; img.src = purl(p.file);
+  await img.decode().catch(() => {}); P = { ...ZERO }; zoom = 1; pan = [0, 0]; $("zoom").value = 1;
+  $("tTitle").value = p.track ? (p.track + (p.car ? " · " + p.car : "")).toUpperCase() : "";
+  buildUI(); render();
+}
+$("bBack").onclick = () => { $("ed").style.display = "none"; $("lib").style.display = "block"; cur = img = null; };
+$("bDel").onclick = async () => { if (!confirm("Supprimer cette photo ?")) return; await post("api/photo/delete", { f: cur.file }); $("bBack").onclick(); loadLib(); };
+function buildUI() {
+  $("fmt").innerHTML = Object.entries(FORMATS).map(([k, f]) => `<option value="${k}">${f[0]}</option>`).join(""); $("fmt").value = fmt;
+  fillRes();
+  $("presets").innerHTML = Object.keys(PRESETS).map(n => `<button data-p="${n}">${n}</button>`).join("");
+  $("presets").querySelectorAll("button").forEach(b => b.onclick = () => { P = { ...ZERO, ...PRESETS[b.dataset.p] }; syncSliders(); render(); });
+  $("sliders").innerHTML = SL.map(([k, l, mn, mx]) => `<label>${l} <b data-v="${k}">0</b></label><input type="range" min="${mn}" max="${mx}" value="0" data-s="${k}">`).join("");
+  $("sliders").querySelectorAll("[data-s]").forEach(r => r.oninput = () => { P[r.dataset.s] = +r.value; $("sliders").querySelector(`[data-v="${r.dataset.s}"]`).textContent = r.value; render(); });
+  syncSliders();
+}
+function syncSliders() { SL.forEach(([k]) => { const r = $("sliders").querySelector(`[data-s="${k}"]`); r.value = P[k]; $("sliders").querySelector(`[data-v="${k}"]`).textContent = P[k]; }); }
+function fillRes() { $("res").innerHTML = FORMATS[fmt][2].map((r, i) => `<option value="${i}">${r[0]}</option>`).join(""); resI = 0; }
+$("fmt").onchange = () => { fmt = $("fmt").value; fillRes(); pan = [0, 0]; render(); };
+$("res").onchange = () => { resI = +$("res").value; };
+$("zoom").oninput = () => { zoom = +$("zoom").value; $("vzoom").textContent = zoom.toFixed(2); render(); };
+["tTitle", "tTele", "tLogo"].forEach(id => $(id).oninput = () => render());
+$("bReset").onclick = () => { P = { ...ZERO }; zoom = 1; pan = [0, 0]; $("zoom").value = 1; syncSliders(); render(); };
+
+// zone de l'image source a garder (selon format, zoom, deplacement)
+function cropRect() {
+  const iw = img.naturalWidth, ih = img.naturalHeight, ratio = FORMATS[fmt][1] || iw / ih;
+  let cw = iw, ch = iw / ratio; if (ch > ih) { ch = ih; cw = ih * ratio; }
+  cw /= zoom; ch /= zoom;
+  const mx = (iw - cw) / 2, my = (ih - ch) / 2;
+  pan[0] = Math.max(-mx, Math.min(mx, pan[0])); pan[1] = Math.max(-my, Math.min(my, pan[1]));
+  return [mx + pan[0], my + pan[1], cw, ch];
+}
+let drag = null;
+$("pv").onpointerdown = e => { drag = { x: e.clientX, y: e.clientY, p: [...pan] }; $("pv").setPointerCapture(e.pointerId); };
+$("pv").onpointermove = e => { if (!drag) return; const [, , cw] = cropRect(), k = cw / $("pv").getBoundingClientRect().width;
+  pan = [drag.p[0] - (e.clientX - drag.x) * k, drag.p[1] - (e.clientY - drag.y) * k]; render(true); };
+$("pv").onpointerup = () => { drag = null; render(); };
+
+/* traitement de l'image (pixels) */
+function blurCanvas(src, r) { const c = document.createElement("canvas"); c.width = src.width; c.height = src.height; const x = c.getContext("2d");
+  x.filter = `blur(${r}px)`; x.drawImage(src, 0, 0); return x.getImageData(0, 0, c.width, c.height).data; }
+function process(W, H, fast) {
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H; const c = cv.getContext("2d", { willReadFrequently: true });
+  const [sx, sy, sw, sh] = cropRect(); c.imageSmoothingQuality = "high"; c.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+  const on = k => P[k] !== 0, any = SL.some(([k]) => on(k));
+  if (any) {
+    const id = c.getImageData(0, 0, W, H), d = id.data, n = W * H;
+    const big = (on("clarity") || on("glow")) && !fast ? blurCanvas(cv, Math.max(4, W / 60)) : (on("clarity") || on("glow")) ? blurCanvas(cv, Math.max(3, W / 60)) : null;
+    const small = on("sharpen") ? blurCanvas(cv, Math.max(1, W / 1500)) : null;
+    const ex = Math.pow(2, P.exposure / 70), cf = 1 + P.contrast / 100, sat = 1 + P.saturation / 100, vib = P.vibrance / 100;
+    const tp = P.temp / 100 * 0.12, tn = P.tint / 100 * 0.1, cl = P.clarity / 100 * 1.4, sh = P.shadows / 100 * 0.6, hl = P.highlights / 100 * 0.6;
+    const shp = P.sharpen / 100 * 1.6, rp = P.redpop / 100, bw = P.bw / 100, gl = P.glow / 100 * 0.7, fd = P.fade / 100, vg = P.vignette / 100, gr = P.grain / 100 * 0.18;
+    const cx = W / 2, cy = H / 2, md = cx * cx + cy * cy;
+    for (let i = 0, p = 0; i < n; i++, p += 4) {
+      let r = d[p] / 255, g = d[p + 1] / 255, b = d[p + 2] / 255;
+      if (big && cl) { r += (r - big[p] / 255) * cl; g += (g - big[p + 1] / 255) * cl; b += (b - big[p + 2] / 255) * cl; }
+      if (small) { r += (r - small[p] / 255) * shp; g += (g - small[p + 1] / 255) * shp; b += (b - small[p + 2] / 255) * shp; }
+      r *= ex; g *= ex; b *= ex;
+      let L = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (sh || hl) { const a = sh * (1 - Math.min(1, L)) ** 2 + hl * Math.min(1, L) ** 2; r += a; g += a; b += a; }
+      r = (r - 0.5) * cf + 0.5; g = (g - 0.5) * cf + 0.5; b = (b - 0.5) * cf + 0.5;
+      r += tp; b -= tp; g -= tn;
+      L = 0.299 * r + 0.587 * g + 0.114 * b;
+      const mxc = Math.max(r, g, b), mnc = Math.min(r, g, b);
+      let s = sat + vib * (1 - Math.min(1, (mxc - mnc) * 1.5));
+      if (rp) { const red = Math.max(0, Math.min(1, (r - Math.max(g, b)) * 4)); s *= red + (1 - red) * (1 - rp); }
+      s *= 1 - bw;
+      r = L + (r - L) * s; g = L + (g - L) * s; b = L + (b - L) * s;
+      if (big && gl) { r = 1 - (1 - r) * (1 - big[p] / 255 * gl); g = 1 - (1 - g) * (1 - big[p + 1] / 255 * gl); b = 1 - (1 - b) * (1 - big[p + 2] / 255 * gl); }
+      if (fd) { r = r * (1 - fd * 0.25) + fd * 0.08; g = g * (1 - fd * 0.25) + fd * 0.08; b = b * (1 - fd * 0.25) + fd * 0.1; }
+      if (vg) { const x = i % W - cx, y = (i / W | 0) - cy, k = 1 - vg * 0.85 * ((x * x + y * y) / md) ** 1.3; r *= k; g *= k; b *= k; }
+      if (gr) { const z = (Math.random() - 0.5) * gr; r += z; g += z; b += z; }
+      d[p] = r * 255; d[p + 1] = g * 255; d[p + 2] = b * 255;
+    }
+    c.putImageData(id, 0, 0);
+  }
+  decorate(c, W, H);
+  return cv;
+}
+function decorate(c, W, H) {   // titre, infos, logo (style course)
+  const u = Math.min(W, H) / 1080, t = $("tTitle").value.trim();
+  if (t) { const fs = 64 * u; c.font = `italic 900 ${fs}px 'Titillium Web', Rajdhani, sans-serif`; const tw = c.measureText(t).width;
+    const x = 60 * u, y = H - 90 * u - (Math.abs(W / H - 9 / 16) < 0.2 || W < H ? 240 * u : 0);
+    c.fillStyle = "#e10600"; c.beginPath(); c.moveTo(x - 20 * u, y - fs * 0.85); c.lineTo(x + tw + 50 * u, y - fs * 0.85); c.lineTo(x + tw + 30 * u, y + fs * 0.25); c.lineTo(x - 40 * u, y + fs * 0.25); c.fill();
+    c.fillStyle = "#fff"; c.textBaseline = "alphabetic"; c.fillText(t, x, y); }
+  if ($("tTele").checked && cur && cur.tele) { const T = cur.tele, s = `${Math.round(T.speed || 0)} KM/H · RAPPORT ${T.gear ?? "-"} · P${T.pos || "-"}`;
+    c.font = `italic 700 ${30 * u}px 'Titillium Web', sans-serif`; c.fillStyle = "rgba(255,255,255,.9)"; c.textBaseline = "alphabetic"; c.fillText(s, 62 * u, H - 40 * u); }
+  if ($("tLogo").checked) { const s = 22 * u, x = W - 60 * u - s * 6, y = 50 * u;
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 2; j++) { c.fillStyle = (i + j) % 2 ? "#0a0a0a" : "#f4f4f4"; c.fillRect(x + i * s / 2, y + j * s / 2, s / 2, s / 2); }
+    c.font = `italic 900 ${s * 1.6}px 'Titillium Web', sans-serif`; c.fillStyle = "#fff"; c.textBaseline = "middle"; c.fillText("RSIM", x + s * 3.3, y + s / 2); }
+}
+let rt = null;
+function render(fast) {
+  if (!img || !img.naturalWidth) return;
+  clearTimeout(rt); rt = setTimeout(() => {
+    const [, , cw, ch] = cropRect(), maxW = fast ? 700 : 1400, k = Math.min(1, maxW / cw, 900 / ch);
+    const out = process(Math.round(cw * k), Math.round(ch * k), fast), pv = $("pv");
+    pv.width = out.width; pv.height = out.height; pv.getContext("2d").drawImage(out, 0, 0);
+  }, fast ? 0 : 60);
+}
+function full() {
+  const r = FORMATS[fmt][2][resI]; const [, , cw, ch] = cropRect();
+  return process(r[1] || Math.round(cw), r[2] || Math.round(ch), false);
+}
+async function withBusy(fn) { $("busy").style.display = "flex"; await new Promise(r => setTimeout(r, 30)); try { return await fn(); } finally { $("busy").style.display = "none"; } }
+$("bDl").onclick = () => withBusy(() => { const cv = full(); const a = document.createElement("a"); a.href = cv.toDataURL("image/png");
+  a.download = "RSIM_" + (cur.car || "photo").replace(/\W+/g, "_") + "_" + cv.width + "x" + cv.height + ".png"; a.click(); });
+$("bSave").onclick = () => withBusy(async () => { const cv = full();
+  await post("api/photo/upload", { name: "retouche", data: cv.toDataURL("image/jpeg", 0.95), meta: Object.assign({}, cur, { kind: "edit", from: cur.file }) });
+  toast("Enregistrée dans la galerie (" + cv.width + "×" + cv.height + ")"); loadLib(); });
+
+fetch("api/capture").then(r => r.json()).then(s => { if (s.cfg && s.cfg.hotSnap) $("hk").textContent = s.cfg.hotSnap; }).catch(() => {});
+loadLib();
+const q = new URLSearchParams(location.search).get("p"); if (q) setTimeout(() => { const p = PH.find(x => x.file === q); if (p) openEd(p); }, 700);
+</script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+/* RSIM - theme "course" : noir / blanc / rouge, damier, typo condensee italique.
+   Charge apres le style de chaque page : il remplace couleurs, polices et formes. */
+@import url("https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,400;0,600;0,700;0,900;1,700;1,900&family=Rajdhani:wght@500;600;700&display=swap");
+
+:root {
+  --bg:#060606; --p:#101010; --p2:#171717; --b:#2a2a2a; --t:#f4f4f4; --m:#9b9b9b;
+  --a:#e10600; --r:#e10600; --g:#21e05d; --white:#ffffff;
+  --chk: repeating-conic-gradient(#f4f4f4 0 25%, #0a0a0a 0 50%) 0 0 / 14px 14px;
+  --font: "Titillium Web", "Rajdhani", "Segoe UI", Roboto, sans-serif;
+}
+html body { background:#060606 linear-gradient(115deg, rgba(225,6,0,.10) 0 18%, transparent 18% 100%) fixed;
+  color:var(--t); font-family:var(--font); letter-spacing:.2px; }
+html body::before { content:""; position:fixed; z-index:50; top:0; left:0; right:0; height:7px; background:var(--chk); pointer-events:none; }
+
+/* en-tetes */
+html body header { background:linear-gradient(90deg, #0b0b0b, #131313) !important; border-bottom:3px solid var(--r) !important; padding-top:16px;
+  position:relative; }
+html body header::after { content:""; position:absolute; right:0; bottom:-3px; width:140px; height:3px; background:var(--chk); background-size:6px 6px; }
+html body h1 { font-family:var(--font); font-weight:900; font-style:italic; text-transform:uppercase; letter-spacing:1.5px; }
+html body h1::before { content:""; display:inline-block; width:6px; height:.9em; background:var(--r); transform:skewX(-18deg); margin-right:10px; vertical-align:-2px; }
+html body h2, html body h3, html body .side h3 { font-family:var(--font); font-style:italic; font-weight:900; text-transform:uppercase; letter-spacing:1.2px; color:var(--white); }
+html body h2::before, html body .side h3::before { content:""; display:inline-block; width:22px; height:4px; background:var(--r); margin-right:8px; vertical-align:middle; transform:skewX(-25deg); }
+html body header a, html body a.homeb { color:#fff !important; font-weight:700; text-transform:uppercase; font-style:italic; letter-spacing:1px;
+  background:var(--r); padding:5px 12px; clip-path:polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); text-decoration:none; }
+html body header a h1 { background:none; }
+html body header a:has(h1) { background:none; clip-path:none; padding:0; }
+
+/* boutons */
+html body button, html body .btn { font-family:var(--font); font-weight:700; text-transform:uppercase; letter-spacing:.6px; font-size:.92em;
+  background:#1b1b1b; color:var(--t); border:1px solid #333; border-radius:2px;
+  clip-path:polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%); padding-left:16px; padding-right:16px; transition:background .12s, border-color .12s; }
+html body button:hover { background:#262626; border-color:var(--r); }
+html body button:disabled { opacity:.45; }
+html body .pri, html body button.pri, html body .cats button.on, html body nav button.on, html body #bMove.on { background:var(--r) !important; border-color:var(--r) !important; color:#fff !important; }
+html body .dan, html body button.dan { background:#1b1b1b; color:#ff6b62; border-color:#4a1512; }
+html body .rec { background:#3a0000 !important; border-color:var(--r) !important; }
+html body .rec.on { background:var(--r) !important; }
+html body nav button { color:#bdbdbd; }
+html body .cats button { border-radius:2px; }
+
+/* champs */
+html body input, html body select, html body textarea { font-family:var(--font); background:#0d0d0d; color:var(--t); border:1px solid #333; border-radius:2px; }
+html body input:focus, html body select:focus, html body textarea:focus { outline:none; border-color:var(--r); box-shadow:0 0 0 1px var(--r); }
+html body input[type=range] { accent-color:var(--r); }
+html body input[type=checkbox] { accent-color:var(--r); }
+
+/* cartes / panneaux */
+html body .tile, html body .card, html body .panel, html body .vc, html body .pf, html body .sess, html body .pg, html body .live, html body .legend span {
+  background:linear-gradient(160deg, #151515, #0c0c0c) !important; border:1px solid #262626 !important; border-radius:3px !important; position:relative; }
+html body .tile:hover, html body .card:hover, html body .vc:hover, html body .pf:hover, html body .sess:hover { border-color:var(--r) !important; }
+html body .tile::after, html body .card::after, html body .vc::after { content:""; position:absolute; top:0; left:0; width:4px; height:100%; background:var(--r);
+  opacity:0; transition:opacity .12s; }
+html body .tile:hover::after, html body .card:hover::after, html body .vc:hover::after { opacity:1; }
+html body .pf.on, html body .sess.on, html body .pg.on, html body .card.cur { border-color:var(--r) !important; box-shadow:inset 4px 0 0 var(--r) !important; }
+html body .tile b, html body .card .name, html body .vc b, html body .sess b, html body .pf b { font-weight:900; font-style:italic; text-transform:uppercase; letter-spacing:.8px; }
+html body .tile .ico { filter:grayscale(1) brightness(1.6); }
+html body .tile.big { background:#0c0c0c linear-gradient(120deg, rgba(225,6,0,.55), rgba(225,6,0,0) 55%) !important; }
+html body .tile.big::before { content:""; position:absolute; right:0; top:0; bottom:0; width:90px; background:var(--chk); background-size:18px 18px; opacity:.85;
+  -webkit-mask:linear-gradient(90deg, transparent, #000); mask:linear-gradient(90deg, transparent, #000); }
+html body .hint, html body small, html body .sub { color:var(--m); }
+html body .tag, html body .pill { border-radius:2px; text-transform:uppercase; font-weight:700; letter-spacing:.5px; }
+html body .toast { background:var(--r) !important; border-radius:2px; font-weight:700; text-transform:uppercase; clip-path:polygon(10px 0,100% 0,calc(100% - 10px) 100%,0 100%); }
+html body td.tm { font-family:"Rajdhani", var(--font); font-size:15px; }
+html body .dot.on { background:var(--g); }
+html body ::-webkit-scrollbar { width:8px; height:8px; } html body ::-webkit-scrollbar-thumb { background:#333; }
+html body ::-webkit-scrollbar-thumb:hover { background:var(--r); }
+/* sous-menu Galerie */
+html body .gnav { display:flex; gap:6px; padding:10px 18px 0; }
+html body .gnav a { color:#bbb; text-decoration:none; font:italic 900 15px var(--font); text-transform:uppercase; letter-spacing:1px; padding:8px 18px;
+  background:#141414; border:1px solid #2a2a2a; clip-path:polygon(9px 0,100% 0,calc(100% - 9px) 100%,0 100%); }
+html body .gnav a.on { background:var(--r); color:#fff; border-color:var(--r); }
+html body header a.gear { background:#111; clip-path:none; padding:0; font-style:normal; }

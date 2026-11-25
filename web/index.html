@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b0e12">
+<meta name="theme-color" content="#060606">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -26,24 +26,31 @@
   .tile.big { grid-column:span 2; background:linear-gradient(135deg, #1b3157, #10161f 70%); }
   .tile.soon { opacity:.55; } .tile .badge { position:absolute; top:14px; right:14px; font-size:11px; padding:2px 8px; border-radius:20px; background:#223; color:var(--m); }
   .warn { margin:0 22px; padding:12px 14px; border-radius:10px; background:#3a2a08; border:1px solid #6a4a10; color:#ffd58a; display:none; }
+  .gear { font-size:28px; text-decoration:none; color:#fff; width:46px; height:46px; display:flex; align-items:center; justify-content:center; border:1px solid #333; background:#111; }
+  .gear:hover { border-color:#e10600; }
+  .tile.big { cursor:pointer; }
+  .tile .sub { margin-top:auto; align-self:flex-start; color:#fff; background:rgba(0,0,0,.45); border:1px solid #444; padding:6px 12px; text-decoration:none; font-weight:700; font-size:13px; position:relative; z-index:2; }
+  .tile .sub:hover { border-color:#fff; }
   @media (max-width:560px) { .tile.big { grid-column:span 1; } }
 </style>
+<link rel="stylesheet" href="theme.css">
 </head>
 <body>
 <header>
+  <a href="settings.html" class="gear" title="Paramètres">⚙</a>
   <img src="icon-192.png" alt="">
   <div><h1>RSIM</h1><small>Performance sim racing</small></div>
   <div class="status" id="status"><span class="dot"></span>…</div>
 </header>
 <main>
-  <a class="tile big" href="live.html"><div class="ico">🏁</div><b>Dash en direct</b><span>Le dashboard de la voiture que tu conduis, en plein écran.</span></a>
-  <a class="tile" href="hub.html"><div class="ico">🗂</div><b>Dashboards</b><span>Tous les dashboards rangés par catégorie, aperçus, attribution aux voitures.</span></a>
-  <a class="tile" href="buttonbox.html"><div class="ico">🎛</div><b>Button box</b><span>Boutons et interrupteurs tactiles : assigne une touche à chacun.</span></a>
-  <a class="tile" href="multipage.html"><div class="ico">▤</div><b>Écrans multi-pages</b><span>Page 1 dash, page 2 pneus, page 3 button box… glisse pour changer.</span></a>
-  <a class="tile" href="buttons.html"><div class="ico">🎮</div><b>Boutons volant</b><span>Boutons du G29 : pages, dashboards, touches.</span></a>
-  <a class="tile soon" href="#" onclick="return false"><span class="badge">bientôt</span><div class="ico">📈</div><b>Télémétrie</b><span>Historique des tours, comparaison de deux tours, freinages, delta.</span></a>
-  <a class="tile soon" href="#" onclick="return false"><span class="badge">bientôt</span><div class="ico">🎛</div><b>Profils FFB</b><span>Réglages Pit House et jeux par simu et par voiture, partage.</span></a>
-  <a class="tile" href="settings.html"><div class="ico">⚙️</div><b>Paramètres</b><span>Connexion au PC, démarrage, orientation.</span></a>
+  <div class="tile big" onclick="location.href='live.html'"><div class="ico">🏁</div><b>Dash</b><span>Ton dash en plein écran : il suit le jeu et la voiture. Glisse ← → pour tes autres pages.</span>
+    <a class="sub" href="hub.html" onclick="event.stopPropagation()">Choisir mes dashs / pages ›</a></div>
+  <a class="tile" href="buttonbox.html"><div class="ico">🎛</div><b>Button box</b><span>Une box par jeu, chaque bouton = une touche.</span></a>
+  <a class="tile" href="remote.html"><div class="ico">🖱</div><b>Télécommande</b><span>Souris, clavier, manette, stream deck.</span></a>
+  <a class="tile" href="videos.html"><div class="ico">🎞</div><b>Galerie</b><span>Vidéos, photos et montages TikTok.</span></a>
+  <a class="tile" href="telemetry.html"><div class="ico">📈</div><b>Télémétrie</b><span>Tes tours : compare, delta, partage.</span></a>
+  <a class="tile" href="ffb.html"><div class="ico">🧲</div><b>FFB</b><span>Réglages volant + jeu, enregistrés tout seuls.</span></a>
+  <a class="tile" href="buttons.html"><div class="ico">🎮</div><b>Boutons volant</b><span>Actions des boutons de ton volant.</span></a>
 </main>
 <script src="api.js"></script>
 <script>
