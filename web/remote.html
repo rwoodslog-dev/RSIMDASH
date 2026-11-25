@@ -42,6 +42,15 @@
   .sh { position:absolute; top:8px; width:22vw; height:52px; } .sh.l { left:max(10px, env(safe-area-inset-left)); } .sh.r { right:max(10px, env(safe-area-inset-right)); }
   .sh2 { top:66px; }
   #p2 .cfg { position:absolute; bottom:6px; left:50%; transform:translateX(-50%); font-size:11px; color:#777; }
+  .modeSw { position:absolute; top:8px; left:calc(50% - 75px); width:150px; height:44px; font-size:14px; }
+  #p2b { grid-template-columns: 1fr 230px; gap:10px; }
+  #gpad { border-radius:16px; border:1px solid #333; background:#0d0d0d radial-gradient(circle at 50% 50%, #171717, #0a0a0a); position:relative; touch-action:none; overflow:hidden; }
+  #gpad::before { content:"GLISSE = ▲ ▼ ◀ ▶  ·  RESTE APPUYÉ = DÉFILE  ·  TAPE = A  ·  2 DOIGTS = B"; position:absolute; bottom:10px; left:0; right:0; text-align:center; font-size:11px; color:#555; font-weight:700; }
+  #garrow { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:90px; color:#e10600; opacity:0; transition:opacity .25s; pointer-events:none; }
+  .gcol { display:grid; gap:8px; grid-template-rows: 1.4fr 1fr .8fr .8fr .8fr .7fr; }
+  .gcol .ga { font-size:30px; color:#21e05d; flex-direction:column; } .gcol .gb { font-size:24px; color:#ff4d42; flex-direction:column; }
+  .g2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; } .g2 .k { font-size:14px; }
+  .modeSw2 { font-size:13px; }
   /* page 3 : stream deck */
   #p3 { grid-template-columns: repeat(6, 1fr); grid-auto-rows: minmax(74px, auto); gap:8px; overflow-y:auto; touch-action:pan-y; align-content:start; }
   #p3 .grp { min-height:22px; }
@@ -85,6 +94,19 @@
   <div class="mid"><div class="k" data-b="SELECT">SELECT</div><div class="k" data-b="START">START</div><div class="k" data-b="HOME">ALT+TAB</div></div>
   <div class="abxy"><div class="k y" data-b="Y">Y</div><div class="k x" data-b="X">X</div><div class="k b" data-b="B">B</div><div class="k a" data-b="A">A</div></div>
   <div class="cfg" id="bMap">⚙ choisir les touches</div>
+  <div class="k modeSw" id="bOne">🖐 1 MAIN</div>
+</div>
+<!-- manette a une main (telephone a plat, main droite) : glisser = fleches, tape = A -->
+<div class="page" id="p2b">
+  <div id="gpad"><div id="garrow"></div></div>
+  <div class="gcol">
+    <div class="k ga" data-b="A">A<small>valider</small></div>
+    <div class="k gb" data-b="B">B<small>retour</small></div>
+    <div class="g2"><div class="k" data-b="LB">LB</div><div class="k" data-b="RB">RB</div></div>
+    <div class="g2"><div class="k" data-b="X">X</div><div class="k" data-b="Y">Y</div></div>
+    <div class="g2"><div class="k" data-b="SELECT">SEL</div><div class="k" data-b="START">START</div></div>
+    <div class="k modeSw2" id="bTwo">🎮 2 MAINS</div>
+  </div>
 </div>
 <div id="map"></div>
 
@@ -222,7 +244,7 @@ addEventListener("blur", releaseAll); document.addEventListener("visibilitychang
 const DEF_MAP = { UP: "UP", DOWN: "DOWN", LEFT: "LEFT", RIGHT: "RIGHT", A: "ENTER", B: "ESC", X: "SPACE", Y: "BACKSPACE",
   LB: "Q", RB: "E", LT: "PGUP", RT: "PGDN", START: "ESC", SELECT: "TAB", HOME: "LALT+TAB" };
 let MAP = Object.assign({}, DEF_MAP, JSON.parse(localStorage.getItem("padMap") || "{}"));
-document.querySelectorAll("#p2 [data-b]").forEach(el => {
+document.querySelectorAll("#p2 [data-b], #p2b [data-b]").forEach(el => {
   let rep = null;
   el.addEventListener("pointerdown", e => { el.setPointerCapture(e.pointerId); el.classList.add("down"); vib(15);
     const k = MAP[el.dataset.b]; act("key:" + k);
@@ -231,6 +253,33 @@ document.querySelectorAll("#p2 [data-b]").forEach(el => {
   const up = () => { el.classList.remove("down"); clearTimeout(rep); rep = null; };
   el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
 });
+/* choix 1 main / 2 mains (memorise) */
+let oneHand = localStorage.getItem("padOne") === "1";
+function showPad() { const on = document.querySelector('#tabs [data-p="p2"]').classList.contains("on");
+  $("p2").classList.toggle("on", on && !oneHand); $("p2b").classList.toggle("on", on && oneHand); }
+$("bOne").onclick = () => { oneHand = true; localStorage.setItem("padOne", "1"); showPad(); };
+$("bTwo").onclick = () => { oneHand = false; localStorage.setItem("padOne", "0"); showPad(); };
+document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", showPad));
+showPad();
+/* pave de glisse : chaque ~55 px = un appui de fleche ; doigt immobile apres un glisser = repetition */
+(() => {
+  const g = $("gpad"), ar = $("garrow"), pts = new Map(); let o = null, dir = null, rep = null, still = null, t0 = 0, moved = 0, maxN = 0;
+  const ARW = { UP: "▲", DOWN: "▼", LEFT: "◀", RIGHT: "▶" };
+  const fire = d => { act("key:" + MAP[d]); vib(10); ar.textContent = ARW[d]; ar.style.opacity = .9; clearTimeout(ar.h); ar.h = setTimeout(() => ar.style.opacity = 0, 250); };
+  const stopRep = () => { clearTimeout(still); clearInterval(rep); rep = null; };
+  g.addEventListener("pointerdown", e => { g.setPointerCapture(e.pointerId); pts.set(e.pointerId, 1); maxN = Math.max(maxN, pts.size);
+    if (pts.size === 1) { o = { x: e.clientX, y: e.clientY }; t0 = performance.now(); moved = 0; dir = null; maxN = 1; } });
+  g.addEventListener("pointermove", e => { if (!o || pts.size > 1) return;
+    const dx = e.clientX - o.x, dy = e.clientY - o.y; moved = Math.max(moved, Math.hypot(dx, dy));
+    if (Math.hypot(dx, dy) > 55) { dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "RIGHT" : "LEFT") : (dy > 0 ? "DOWN" : "UP");
+      fire(dir); o = { x: e.clientX, y: e.clientY }; stopRep();
+      still = setTimeout(() => { rep = setInterval(() => fire(dir), 120); }, 450); }
+    else if (Math.hypot(dx, dy) > 12) stopRep(); });
+  const up = e => { pts.delete(e.pointerId); if (pts.size) return; stopRep();
+    if (performance.now() - t0 < 280 && moved < 14) { if (maxN >= 2) { act("key:" + MAP.B); vib(20); } else { act("key:" + MAP.A); vib(20); } }
+    o = null; };
+  g.addEventListener("pointerup", up); g.addEventListener("pointercancel", up);
+})();
 $("bMap").onclick = async () => {
   const keys = (await (await fetch("api/bindings")).json()).keys || [];
   const opts = k => [...new Set([MAP[k], ...keys, "LALT+TAB", "LALT+F4", "LCTRL+TAB"])].map(x => `<option ${x === MAP[k] ? "selected" : ""}>${x}</option>`).join("");
